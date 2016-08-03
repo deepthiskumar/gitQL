@@ -1,0 +1,11 @@
+# Compiled source #
+###################
+*.hi
+*.exe
+*.o
+*.so
+
+# Opened files #
+##################
+*~
+*.~lock.*
