@@ -225,29 +225,49 @@ step _ _                                    = []
 
 
 acceptor' :: NFAproducer -> VText -> (Bool,[Match])
-acceptor' nfa vtext = nfaRun' ( {- epsClosure -} [(nfa nfaFinal,"")]) vtext
+acceptor' nfa vtext = nfaRunSkipBegin (nfa nfaFinal) vtext --nfaRun' ( {- epsClosure -} [(nfa nfaFinal,"")]) vtext
 
 --The NFA interpreter
 
-nfaRun' :: [(NFANode,Match)] -> VText -> (Bool,[Match])
-nfaRun' ns (VText (v:vs)) = nfaRun' (nfaStep' ns (VText [v])) (VText vs)
-nfaRun' ns (VText [])     = let nodes = concat (map step ns) in (not (null ( {- epsClosure -} nodes)), map (snd) nodes)
-   where
+nfaRun' :: NFANode -> [(NFANode,Match)] -> VText -> (Bool,[Match])
+nfaRun' orig [] vt      = nfaRerun orig [] vt
+nfaRun' orig ns (VText (v:vs)) 
+  | not $ finalState ns = nfaRun' orig (nfaStep' ns (VText [v])) (VText vs)
+  | otherwise           = nfaRerun orig [] (VText (v:vs))  --todo : need to propagate the matches 
+nfaRun' _ ns (VText []) = let nodes = concat (map step ns) in (not (null ( {- epsClosure -} nodes)), map (snd) nodes)
+   where --wait till the eo-input to check if there is a match
      step (NFAEnd n',m) = [(n',m)]
      step (NFAFinal,m)  = [(NFAFinal,m)]
      step (NFATable pairs anys ends True,m) = [(NFAFinal,m)]
      step (NFATable pairs anys ends finals,m) = map (\end -> (end,m)) ends
      step _           = []
+ 
+finalState :: [(NFANode,Match)] -> Bool
+finalState ((NFAEnd n',m):ns)  = True
+finalState ((NFAFinal,m):ns)   = True
+finalState _              = False --NFATable can be checked only if all the input is consumed.
+  
+--skip the beginning characters until a match is found   
+nfaRunSkipBegin :: NFANode -> VText -> (Bool,[Match])
+nfaRunSkipBegin n (VText [])                      = (False,["No Match"]) --to do. print the older matches as well
+nfaRunSkipBegin n vt@(VText (v:vs)) 
+  | (length $ nfaStep' [(n,"")] (VText [v])) == 0 = nfaRunSkipBegin n (VText vs)
+  | otherwise                                     = nfaRerun n [(n,"")] vt
+
+--Check if the end transition has reached
+nfaRerun :: NFANode -> [(NFANode,Match)] -> VText -> (Bool,[Match])
+nfaRerun orig [] v = nfaRunSkipBegin orig v
+nfaRerun orig ns v = nfaRun' orig ns v 
 
 -- for testing
-nfa regex = [ ((fst(head(nnRegexp regex))) nfaFinal, "")]
+nfa regex = (fst(head(nnRegexp regex))) nfaFinal -- [ ((fst(head(nnRegexp regex))) nfaFinal, "")]
 
 toVtext st = let (Right vtext) = ccParser st in vtext 
 
 --show VText as is
 showV :: VText -> String
 showV (VText [])     = ""
-showV (VText (v:vs)) = "VText [" ++ showS v ++ "," ++ showV (VText vs) ++ "]"
+showV (VText (v:vs)) = "VText " ++ concatMap (showS) vs 
 
 showS :: Segment -> String
 showS (Plain x)      = "(Plain " ++ x ++ ")"
@@ -289,4 +309,11 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 --
 -- >>> searchInVText ".*c" (toVtext "@1<ab@,@2<x@,z@>y@>@3<c@,l@>")
 -- (True,["abc","xbc","zbc","ayc","xyc","zyc"])
+--
+-- >>> searchInVText ".*c.*" (toVtext "@1<ab@,@2<x@,z@>c@>@3<c@,l@>")
+-- (True,["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"])
+--
+-- | NFANode : (NFAChar 'a' (NFATable [] [NFATable [] [] [] True] [] True)
+-- >>> searchInVText "a.?" (toVtext "@1<ab@,@2<x@,z@>c@>")
+-- (True,["ab","ac"]
 
