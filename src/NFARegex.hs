@@ -220,7 +220,7 @@ nfaStepSegment states (Chc d v1 v2)                 = (nfaStep' states v1) ++ (n
 step :: Char -> (NFANode,Match) -> [(NFANode,Match)]
 step c (NFAChar c' n',m) | c == c'          = [(n',m++[c])]
 step c (NFAAny n',m)                        = [(n',m++[c])]
-step c (NFATable pairs anys ends finals,m)  = [ (n',m++[c]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,m)) anys)
+step c (NFATable pairs anys ends finals,m)  = [ (n',m++[c]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,m++[c])) anys)
 step _ _                                    = []
 
 
@@ -283,4 +283,10 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 --
 -- >>> searchInVText "zb" (toVtext "@1<ab@,@2<x@,z@>y@>")
 -- (True,["zb"])
+--
+-- >>> searchInVText "a.c" (toVtext "@1<ab@,@2<x@,z@>y@>c")
+-- (True,["abc","ayc"])
+--
+-- >>> searchInVText ".*c" (toVtext "@1<ab@,@2<x@,z@>y@>@3<c@,l@>")
+-- (True,["abc","xbc","zbc","ayc","xyc","zyc"])
 
