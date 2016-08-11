@@ -60,7 +60,23 @@ instance Show VText where
 instance Show Segment where
   show (Plain t)     = t
   show (Chc d v v') = showChcNoColor d (map show [v,v'])
+  
+{-instance Show VText where
+  show = showV
 
+instance Show Segment where
+  show = showS
+  
+
+--show VText as is
+showV :: VText -> String
+showV (VText [])     = ""
+showV (VText (v:vs)) = "VText [" ++ showS v ++ "," ++ showV (VText vs) ++ "]"
+
+showS :: Segment -> String
+showS (Plain x)      = "(Plain " ++ x ++ ")"
+showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV v2++ ")"
+-}
 instance Eq VText where
   (==) (VText []) (VText [])         = True
   (==) (VText (x:xs)) (VText (y:ys)) = x==y && xs==ys

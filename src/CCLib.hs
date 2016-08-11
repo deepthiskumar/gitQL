@@ -295,3 +295,14 @@ sepSegments xs = case last xs of --last takes O(n). Use sequence which has const
           l' f x y = ((f $! Chc dim') x' y) ^: (l (VText vs) ds')
             where
               (x', ds') = l x ds
+
+--General helper functions
+------------------------------------------------------------------------------
+  stripNewline :: [Char] -> [Char]
+  stripNewline []                 = []
+  stripNewline ('\n' :[])         = []
+  stripNewline (x:xs)             = x : stripNewline xs
+
+
+  errorIf :: Bool -> String -> IO ()
+  errorIf b m = if b then print m else return ()
