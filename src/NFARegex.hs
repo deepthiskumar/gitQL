@@ -50,12 +50,11 @@ vSearch regex file = do
    let matched = searchInVText regex vtext
    print matched
 
-searchInVText :: String -> VText -> [Bool]
-searchInVText regex vtext = do
- let vtext' = vSplit vtext
- let acc = acceptor' (fst(head(nnRegexp regex)))
- let acc' = acc vtext'--unlines . filter acc . lines
- [acc'] --figure out how to get the VText by filtering h
+searchInVText :: String -> VText -> (Bool,[Match])
+searchInVText regex vtext = let vtext' = vSplit vtext
+                                acc = acceptor' (fst(head(nnRegexp regex)))
+                            in acc vtext'--unlines . filter acc . lines
+ --figure out how to get the VText by filtering h
 
 parse_args :: [String] -> IO()
 parse_args (regexp: file : []) = do
@@ -207,34 +206,81 @@ nfaRunNodes ns [] = (concat (map step ns))
 --step function for the NFA interpreter to accept VText
 --Note if epsilon compression is removed above, all {- epsClosure -} must 
 --be uncommented!
-nfaStep' :: [NFANode] -> VText -> [NFANode]
+type Match = String
+
+nfaStep' :: [(NFANode,Match)] -> VText -> [(NFANode,Match)]
 nfaStep' states (VText vs) = concatMap ( nfaStepSegment states) vs
 
-nfaStepSegment :: [NFANode] -> Segment -> [NFANode]
-nfaStepSegment states (Plain [c])                   = {- epsClosure -} concatMap (step c) states
+nfaStepSegment :: [(NFANode,Match)] -> Segment -> [(NFANode,Match)]
+nfaStepSegment states (Plain [c])                   = {- epsClosure -} concatMap (step c ) states
 nfaStepSegment states (Chc d (VText [Plain [c]]) v) = (concatMap (step c) states) ++ (nfaStep' states v) 
 nfaStepSegment states (Chc d v (VText [Plain [c]])) = concatMap (step c) states ++ (nfaStep' states v)
 nfaStepSegment states (Chc d v1 v2)                 = (nfaStep' states v1) ++ (nfaStep' states v2)
  
-step :: Char -> NFANode -> [NFANode]
-step c (NFAChar c' n') | c == c'          = [n']
-step _ (NFAAny n')                        = [n']
-step c (NFATable pairs anys ends finals)  = [ n' | (c',n') <- pairs, c == c' ] ++ anys
-step _ _                                  = []
+step :: Char -> (NFANode,Match) -> [(NFANode,Match)]
+step c (NFAChar c' n',m) | c == c'          = [(n',m++[c])]
+step c (NFAAny n',m)                        = [(n',m++[c])]
+step c (NFATable pairs anys ends finals,m)  = [ (n',m++[c]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,m)) anys)
+step _ _                                    = []
 
 
-acceptor' :: NFAproducer -> VText -> Bool
-acceptor' nfa vtext = nfaRun' ( {- epsClosure -} [nfa nfaFinal]) vtext
+acceptor' :: NFAproducer -> VText -> (Bool,[Match])
+acceptor' nfa vtext = nfaRun' ( {- epsClosure -} [(nfa nfaFinal,"")]) vtext
 
 --The NFA interpreter
 
-nfaRun' :: [NFANode] -> VText -> Bool
+nfaRun' :: [(NFANode,Match)] -> VText -> (Bool,[Match])
 nfaRun' ns (VText (v:vs)) = nfaRun' (nfaStep' ns (VText [v])) (VText vs)
-nfaRun' ns (VText [])     = not (null ( {- epsClosure -} (concat (map step ns))))
+nfaRun' ns (VText [])     = let nodes = concat (map step ns) in (not (null ( {- epsClosure -} nodes)), map (snd) nodes)
    where
-     step (NFAEnd n') = [n']
-     step (NFAFinal)  = [NFAFinal]
-     step (NFATable pairs anys ends True) = [NFAFinal]
-     step (NFATable pairs anys ends finals) = ends
+     step (NFAEnd n',m) = [(n',m)]
+     step (NFAFinal,m)  = [(NFAFinal,m)]
+     step (NFATable pairs anys ends True,m) = [(NFAFinal,m)]
+     step (NFATable pairs anys ends finals,m) = map (\end -> (end,m)) ends
      step _           = []
+
+-- for testing
+nfa regex = [ ((fst(head(nnRegexp regex))) nfaFinal, "")]
+
+toVtext st = let (Right vtext) = ccParser st in vtext 
+
+--show VText as is
+showV :: VText -> String
+showV (VText [])     = ""
+showV (VText (v:vs)) = "VText [" ++ showS v ++ "," ++ showV (VText vs) ++ "]"
+
+showS :: Segment -> String
+showS (Plain x)      = "(Plain " ++ x ++ ")"
+showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV v2++ ")"
+
+-- | Doctests - searchInVText returns a pair of boolean and the matched string
+-- >>> searchInVText "a" (toVtext "a")
+-- (True,["a"])
+--
+-- | currently it matches the whole expression. Therefore the following will match only for "a."|"ab"|"a.*" etc
+-- >>> searchInVText "a" (toVtext "ab")
+-- (False,[])
+--
+-- >>> searchInVText "a" (toVtext "@1<a@,b@>")
+-- (True,["a"])
+--
+-- >>> searchInVText "a" (toVtext "@1<a@,a@>")
+-- (True,["a","a"])
+--
+-- >>> searchInVText "xy" (toVtext "@1<ab@,xy@>")
+-- (True,["xy"])
+--
+-- >>> searchInVText "ay" (toVtext "@1<ab@,xy@>")
+-- (True,["ay"])
+--
+-- | Following doesnot match because 'a' and 'x' are characters in the same place 
+--   and therefore cannot occur beside each other in 1<ab,xy>
+-- >>> searchInVText "ax" (toVtext "@1<ab@,xy@>")
+-- (False,[])
+--
+-- >>> searchInVText "az" (toVtext "@1<ab@,@2<x@,z@>y@>")
+-- (False,[])
+--
+-- >>> searchInVText "zb" (toVtext "@1<ab@,@2<x@,z@>y@>")
+-- (True,["zb"])
 
