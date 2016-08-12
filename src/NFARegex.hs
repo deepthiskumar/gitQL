@@ -50,7 +50,7 @@ vSearch regex file = do
    let matched = searchInVText regex vtext
    print matched
 
-searchInVText :: String -> VText -> (Bool,[Match])
+searchInVText :: String -> VText -> [Match]
 searchInVText regex vtext = let vtext' = vSplit vtext
                                 acc = acceptor' (fst(head(nnRegexp regex)))
                             in acc vtext'--unlines . filter acc . lines
@@ -224,40 +224,47 @@ step c (NFATable pairs anys ends finals,m)  = [ (n',m++[c]) | (c',n') <- pairs, 
 step _ _                                    = []
 
 
-acceptor' :: NFAproducer -> VText -> (Bool,[Match])
+acceptor' :: NFAproducer -> VText -> [Match]
 acceptor' nfa vtext = nfaRunSkipBegin (nfa nfaFinal) vtext --nfaRun' ( {- epsClosure -} [(nfa nfaFinal,"")]) vtext
 
 --The NFA interpreter
 
-nfaRun' :: NFANode -> [(NFANode,Match)] -> VText -> (Bool,[Match])
-nfaRun' orig [] vt      = nfaRerun orig [] vt
+nfaRun' :: NFANode -> [(NFANode,Match)] -> VText -> [Match]
+nfaRun' orig [] vt                = nfaRerun orig [] [] vt --failed match
 nfaRun' orig ns (VText (v:vs)) 
-  | not $ finalState ns = nfaRun' orig (nfaStep' ns (VText [v])) (VText vs)
-  | otherwise           = nfaRerun orig [] (VText (v:vs))  --todo : need to propagate the matches 
-nfaRun' _ ns (VText []) = let nodes = concat (map step ns) in (not (null ( {- epsClosure -} nodes)), map (snd) nodes)
-   where --wait till the eo-input to check if there is a match
-     step (NFAEnd n',m) = [(n',m)]
-     step (NFAFinal,m)  = [(NFAFinal,m)]
-     step (NFATable pairs anys ends True,m) = [(NFAFinal,m)]
-     step (NFATable pairs anys ends finals,m) = map (\end -> (end,m)) ends
-     step _           = []
+  | (length $ concat (map finalState ns) ) == 0 = nfaRun' orig (nfaStep' ns (VText [v])) (VText vs)
+  | otherwise                     = nfaRerun orig [] (getFinalMatches ns) (VText (v:vs))  --todo : need to propagate the matches 
+nfaRun' _ ns (VText [])           = map (snd) (concat (map finalStateExt ns))
+
+getFinalMatches :: [(NFANode,Match)] -> [Match]
+getFinalMatches ns = map (snd) (concat (map finalState ns) )
  
-finalState :: [(NFANode,Match)] -> Bool
-finalState ((NFAEnd n',m):ns)  = True
-finalState ((NFAFinal,m):ns)   = True
-finalState _              = False --NFATable can be checked only if all the input is consumed.
+finalState :: (NFANode,Match) -> [(NFANode,Match)]
+finalState (NFAEnd n',m)  = [(n',m)]
+finalState (NFAFinal,m)   = [(NFAFinal,m)]
+finalState _              = [] --NFATable can be checked only if all the input is consumed.
+
+--When all the input is consumed. if there are extended regex at the end
+finalStateExt :: (NFANode,Match) -> [(NFANode,Match)]
+finalStateExt (NFAEnd n',m)                       = [(n',m)]
+finalStateExt (NFAFinal,m)                        = [(NFAFinal,m)]
+finalStateExt (NFATable pairs anys ends True,m)   = [(NFAFinal,m)]
+finalStateExt (NFATable pairs anys ends finals,m) = map (\end -> (end,m)) ends
+finalStateExt _                                   = []
+
   
 --skip the beginning characters until a match is found   
-nfaRunSkipBegin :: NFANode -> VText -> (Bool,[Match])
-nfaRunSkipBegin n (VText [])                      = (False,["No Match"]) --to do. print the older matches as well
+nfaRunSkipBegin :: NFANode -> VText -> [Match]
+nfaRunSkipBegin n (VText [])                      = [] --no matches in this iteration
 nfaRunSkipBegin n vt@(VText (v:vs)) 
   | (length $ nfaStep' [(n,"")] (VText [v])) == 0 = nfaRunSkipBegin n (VText vs)
-  | otherwise                                     = nfaRerun n [(n,"")] vt
+  | otherwise                                     = nfaRun' n [(n,"")] vt
 
---Check if the end transition has reached
-nfaRerun :: NFANode -> [(NFANode,Match)] -> VText -> (Bool,[Match])
-nfaRerun orig [] v = nfaRunSkipBegin orig v
-nfaRerun orig ns v = nfaRun' orig ns v 
+--Check if the end transition has reached. 
+nfaRerun :: NFANode -> [(NFANode,Match)] -> [Match] -> VText -> [Match]
+nfaRerun orig [] ms (VText [])      = ms
+nfaRerun orig [] ms v               = ms ++ nfaRunSkipBegin orig v
+nfaRerun orig ns ms v               = ms ++ nfaRun' orig ns v 
 
 -- for testing
 nfa regex = (fst(head(nnRegexp regex))) nfaFinal -- [ ((fst(head(nnRegexp regex))) nfaFinal, "")]
@@ -275,45 +282,59 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 
 -- | Doctests - searchInVText returns a pair of boolean and the matched string
 -- >>> searchInVText "a" (toVtext "a")
--- (True,["a"])
+-- ["a"]
 --
--- | currently it matches the whole expression. Therefore the following will match only for "a."|"ab"|"a.*" etc
+-- | Fixed. Now matches substring
 -- >>> searchInVText "a" (toVtext "ab")
--- (False,[])
+-- ["a"]
 --
 -- >>> searchInVText "a" (toVtext "@1<a@,b@>")
--- (True,["a"])
+-- ["a"]
 --
 -- >>> searchInVText "a" (toVtext "@1<a@,a@>")
--- (True,["a","a"])
+-- ["a","a"]
 --
 -- >>> searchInVText "xy" (toVtext "@1<ab@,xy@>")
--- (True,["xy"])
+-- ["xy"]
 --
 -- >>> searchInVText "ay" (toVtext "@1<ab@,xy@>")
--- (True,["ay"])
+-- ["ay"]
 --
 -- | Following doesnot match because 'a' and 'x' are characters in the same place 
 --   and therefore cannot occur beside each other in 1<ab,xy>
 -- >>> searchInVText "ax" (toVtext "@1<ab@,xy@>")
--- (False,[])
+-- []
 --
 -- >>> searchInVText "az" (toVtext "@1<ab@,@2<x@,z@>y@>")
--- (False,[])
+-- []
 --
 -- >>> searchInVText "zb" (toVtext "@1<ab@,@2<x@,z@>y@>")
--- (True,["zb"])
+-- ["zb"]
 --
 -- >>> searchInVText "a.c" (toVtext "@1<ab@,@2<x@,z@>y@>c")
--- (True,["abc","ayc"])
+-- ["abc","ayc"]
 --
 -- >>> searchInVText ".*c" (toVtext "@1<ab@,@2<x@,z@>y@>@3<c@,l@>")
--- (True,["abc","xbc","zbc","ayc","xyc","zyc"])
+-- ["abc","xbc","zbc","ayc","xyc","zyc"]
 --
 -- >>> searchInVText ".*c.*" (toVtext "@1<ab@,@2<x@,z@>c@>@3<c@,l@>")
--- (True,["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"])
+-- ["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"]
 --
 -- | NFANode : (NFAChar 'a' (NFATable [] [NFATable [] [] [] True] [] True)
 -- >>> searchInVText "a.?" (toVtext "@1<ab@,@2<x@,z@>c@>")
--- (True,["ab","ac"]
+-- ["ab","ac"]
+--
+-- >>> searchInVText ".?m" (toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
+-- ["cm","lm"]
+--
+-- >>> searchInVText ".?b" (toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
+-- ["ab","xb","zb"]
+--
+-- >>> searchInVText "a.*l" (toVtext "@1<ab@,@2<x@,z@>y@>\n@1<cd@,lm@>\n@3<e@,n@>")
+-- ["ab\nl","ay\nl"]
+--
+-- | the langauge for Alt and subexpression needs "\\" in order to not match to the literal.
+--   This is opposite to all the regex behaviours
+-- >>> searchInVText "\\(a\\|z\\).*l" (toVtext "@1<ab@,@2<x@,z@>y@>\n@1<cd@,lm@>\n@3<e@,n@>")
+-- ["ab\nl","zb\nl","ay\nl","zy\nl"]
 

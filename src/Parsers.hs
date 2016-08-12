@@ -1,3 +1,4 @@
+module Parsers where
 --------------------------------------------------
 -- $Log: Parsers.hs,v $
 -- Revision 1.3  1994/03/15  15:34:53  thiemann
@@ -11,7 +12,6 @@
 --
 -- $Locker: thiemann $
 --------------------------------------------------
-module Parsers where
 
 infixl 6 `using`, `using2`
 infixr 7 `alt`

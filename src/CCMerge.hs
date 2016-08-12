@@ -74,7 +74,7 @@ getSelection d ((LSel d'):ss) = if d == d' then Just L else d `getSelection` ss
 getSelection d ((RSel d'):ss) = if d == d' then Just R else d `getSelection` ss
 
 
--- | tests for partial view decision
+--  tests for partial view decision
 --
 -- >>>partialDecision  [RSel 1,RSel 2] (VText [Chc 1 (plain "a") (plain "x"),Chc 2 (plain "b") (plain "y") ])
 -- xy
@@ -87,7 +87,7 @@ getSelection d ((RSel d'):ss) = if d == d' then Just R else d `getSelection` ss
 -- >>>partialDecision  [LSel 1] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y") ])
 -- man2<b,y>
 -- >>>partialDecision  [RSel 1,RSel 2] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y")]) 
---  m3<x,z>ny
+-- m3<x,z>ny
 -- >>>partialDecision  [RSel 3,RSel 2] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y")])
 -- m1<a,z>ny
 
@@ -136,7 +136,7 @@ getPlainChar []     = [Plain ""]
 getPlainChar [x]    = [Plain [x]]
 getPlainChar (x:xs) = Plain [x] : getPlainChar xs
 
--- |
+-- 
 -- >>> vSplit (VText [Plain "abc"])
 -- abc
 --
@@ -254,7 +254,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
                              in  (rs', max (maxDimensionS as') d')
 
 
--- | Unifying VText
+--  Unifying VText
 -- >>> unifyVText (VText [Chc 1 (plain "a") (plain "x"), Chc 1 (plain "b") (plain "y")])
 -- 1<ab,xy>
 -- >>> unifyVText (VText [Plain "l", Plain "m",Chc 1 (plain "a") (plain "x"), Chc 1 (plain "b") (plain "y")])
@@ -268,7 +268,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- >>> unifyVText (VText [Chc 1 (VText[Plain "a",Plain "b", Chc 2 (plain "c") (plain "d"), Chc 2 (plain "e") (plain "f")]) (plain "wxyz")])
 -- 1<ab2<ce,df>,wxyz>
 
--- | Renaming dimensions
+--  Renaming dimensions
 -- >>> renameDimensions 2 0 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"])
 -- 3<ab,4<x,z>y>c
 -- >>> renameDimensions 2 1 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"])
@@ -277,7 +277,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- 1<ab,2<x,z>y>c
 
 
--- | merge 2 different vTexts.
+--  merge 2 different vTexts.
 --
 -- Changes only in the left branch
 -- >>> mergeCC 0 (VText [Plain "ab", Chc 1 (VText[Plain "c"]) (VText[Plain "x"])],1) (VText [Plain "abc"],0)
@@ -287,7 +287,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Plain "a"]) (VText[Plain "x"]), Plain "bc"],1) (VText [Plain "abc"],0)
 -- (1<a,x>bc,1)
 --
--- | Changes only in the right branch
+--  Changes only in the right branch
 --
 -- >>> mergeCC 0 (VText [Plain "abc"],0) (VText [Plain "ab", Chc 1 (VText[Plain "c"]) (VText[Plain "x"])],1)
 -- (ab1<c,x>,1)
@@ -296,7 +296,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- >>> mergeCC 0 (VText [Plain "abc"],0) (VText [Chc 1 (VText[Plain "a"]) (VText[Plain "x"]), Plain "bc"],1)
 -- (1<a,x>bc,1)
 --
--- | Changes in both the branches
+--  Changes in both the branches
 --
 -- >>> mergeCC 0 (VText [Plain "a", Chc 1 (VText[Plain "b"]) (VText[Plain "y"])],1) (VText [Plain "a", Chc 1 (VText[Plain "b"]) (VText[Plain "x"])],1)
 -- (a1<2<b,y>,x>,2)
@@ -312,27 +312,27 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- >>> mergeCC 0 (VText [Plain "a", Chc 1 (VText [Plain ""]) (VText [Plain "x"]),Plain "b"],1) (VText [Plain "a", Chc 1 (VText [Plain ""]) (VText [Plain "y"]),Plain "b"],1)
 -- (a1<2<,x>,y>b,2)
 --
--- | overlapping changes
+--  overlapping changes
 --
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Plain "ab"]) (VText[Plain "xy"]), Plain "cde"],1 ) (VText [Chc 1 (VText[Plain "a"]) (VText[Plain "m"]), Plain "bcde"],1)
 -- (1<2<a,x>,m>2<b,y>cde,2)
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Plain "a"]) (VText[Plain "m"]), Plain "bcde"],1 ) (VText [Chc 1 (VText[Plain "ab"]) (VText[Plain "xy"]), Plain "cde"],1)
 -- (1<2<a,m>b,xy>cde,2)
 --
--- | Chain edits
+--  Chain edits
 -- >>> mergeCC 0 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"],2) (plain "abc",0)
 -- (1<ab,2<x,z>y>c,2)
 -- >>> mergeCC 0 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"],2) (VText [Plain "a",Chc 1 (plain "bc") (plain "lm")],1)
 -- (2<a,3<x,z>>1<2<b,y>c,lm>,3)
 --
--- | branch edits
+--  branch edits
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (plain "ab"),Plain "c"],2) (plain "xyc",0)
 -- (1<2<x,z>y,ab>c,2)
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (plain "ab") ,Plain "c"],2) (VText [Plain "x",Chc 1 (plain "yc") (plain "lm")],1)
 -- (2<3<x,z>,a>1<2<y,b>c,lm>,3)
 --
 
--- | branch and chain edits
+--  branch and chain edits
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (VText[Chc 3 (plain "a") (plain "l"),Plain "b"]),Plain "c"],3) (plain "xyc",0)
 -- (1<2<x,z>y,3<a,l>b>c,3)
 --
@@ -351,7 +351,7 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- >>> mergeCC 0 (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (VText[Chc 3 (plain "a") (plain "l"),Plain "b"]),Plain "c"],3) (VText [Plain "x",Chc 1 (plain "yc") (plain "l")],1)
 -- (2<3<x,z>,4<a,l>>1<2<y,b>c,l>,4)
 --
--- | Changes in both the branches. There can only be changes in one branch
+--  Changes in both the branches. There can only be changes in one branch
 -- >>> mergeCC 2 (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (plain "ab") ,Plain "c"],2) (VText [Chc 1 (VText[Chc 2 (plain "x") (VText [Chc 3 (plain "z") (plain "i")]),Plain "y"]) (VText[Chc 3 (plain "a") (plain "j"),Plain "b"]),Chc 1 (plain "c") (plain "m")],3)
 -- (*** Exception: Prelude.undefined
 --
@@ -359,20 +359,20 @@ mergeCC cd (vs,d) (vs',d') = let as'= renameDimensions d' cd (vSplit vs)
 -- (1<4<ab,5<x,z>y>c,2<lm,3<k,p>>o>,5)
 --
 --
--- | Branch after some modifications - i,e., there are some common dimesnions in both the VTexts
+--  Branch after some modifications - i,e., there are some common dimesnions in both the VTexts
 --
 -- >>> mergeCC 1 (VText [Chc 1 (VText[Plain "ab"]) (VText[Plain "xy"]), Plain "cde"],1 ) (VText [Chc 1 (VText[Plain "ab"]) (VText[Chc 2 (plain "x") (plain "i"),Plain "y"]), Plain "cde"],2)
 -- (1<ab,2<x,i>y>cde,2)
 -- >>> mergeCC 1 (VText [Chc 1 (VText[Plain "ab"]) (VText[Chc 2 (plain "x") (plain "i"),Plain "y"]), Plain "cde"],2 ) (VText [Chc 1 (VText[Plain "ab"]) (VText[Plain "xy"]), Plain "cde"],1)
 -- (1<ab,2<x,i>y>cde,2)
 --
--- | Chain edits
+--  Chain edits
 -- >>> mergeCC 2 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"],2) (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Chc 3 (plain "y") (plain "i")]),Plain "c"],3)
 -- (1<ab,2<x,z>3<y,i>>c,3)
 -- >>> mergeCC 2 (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Chc 3 (plain "y") (plain "i")]),Plain "c"],3) (VText [Chc 1 (plain "ab") (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]),Plain "c"],2)
 -- (1<ab,2<x,z>3<y,i>>c,3)
 --
--- | branch edits
+--  branch edits
 -- >>> mergeCC 2 (VText [Chc 1 (VText[Chc 2 (VText[Chc 3 (plain "x") (plain "i") ]) (plain "z"),Plain "y"]) (plain "ab"),Plain "c"],3) (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (plain "ab"),Plain "c"],2)
 -- (1<2<3<x,i>,z>y,ab>c,3)
 -- >>> mergeCC 2 (VText [Chc 1 (VText[Chc 2 (VText[Chc 3 (plain "x") (plain "i") ]) (plain "z"),Plain "y"]) (VText[Chc 4 (plain "a") (VText[Chc 5 (plain "j") (plain "k")]),Plain "b"]),Plain "c"],3) (VText [Chc 1 (VText[Chc 2 (plain "x") (plain "z"),Plain "y"]) (VText[Chc 4 (plain "a") (plain "j"),Plain "b"]),Plain "c"],2)
