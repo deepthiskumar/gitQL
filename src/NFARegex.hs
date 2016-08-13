@@ -246,11 +246,11 @@ updateMatchChc d ms [] m   = map (\(n',m') -> (n', appendVTexts m (VText [Chc d 
 updateMatchChc d [] ms m   = map (\(n',m') -> (n', appendVTexts m (VText [Chc d (VText []) m']))) ms
 updateMatchChc d ((nl,ml):msL) ((nr,mr):msR) m  -- (nl == nr)  = (nl,appendVTexts m (VText [Chc d ml mr])) : updateMatchChc d msL msR m
   | (length $ finalStateExt (nl,ml)) > 0 
-      && (length $ finalStateExt (nr,mr)) == 0 =  (nl,appendVTexts m (VText [Chc d ml mr])) 
-                                                    : updateMatchChc d msL msR m--Identify such a case : searchInVText ".*c" (toVtext "@3<c@,l@>").
-  | (length $ finalStateExt (nr,mr)) > 0 
-      && (length $ finalStateExt (nl,ml)) == 0 = (nr,appendVTexts m (VText [Chc d ml mr])) 
-                                                    : updateMatchChc d msL msR m
+      && (length $ finalStateExt (nr,mr)) == 0 =  [(nl,appendVTexts m (VText [Chc d ml (VText [])])),(nr,appendVTexts m (VText [Chc d ml mr]))]
+                                                    ++ updateMatchChc d msL msR m--Identify such a case : searchInVText ".*c" (toVtext "@3<c@,l@>").
+  | (length $ finalStateExt (nl,ml)) == 0 
+      && (length $ finalStateExt (nr,mr)) > 0  = [(nl,appendVTexts m (VText [Chc d ml mr])),(nr,appendVTexts m (VText [Chc d (VText []) mr]))]
+                                                    ++ updateMatchChc d msL msR m
   | (length $ finalStateExt (nl,ml)) > 0 
       && (length $ finalStateExt (nr,mr)) > 0  = (nl,appendVTexts m (VText [Chc d ml mr])) 
                                                     : updateMatchChc d msL msR m--since both are successfull, doesnt matter which final node we pick
@@ -263,7 +263,7 @@ acceptor' nfa vtext = nfaRunSkipBegin (nfa nfaFinal) vtext --nfaRun' ( {- epsClo
 
 nfaRun' :: NFANode -> [(NFANode,Match)] -> VText -> [Match]
 nfaRun' orig [] vt                = nfaRerun orig [] [] vt --failed match
-nfaRun' orig ns (VText (v:vs)) 
+nfaRun' orig ns (VText (v:vs))
   | (length $ concat (map finalState ns) ) == 0 = nfaRun' orig (nfaStep' ns (VText [v])) (VText vs)
   | otherwise                     = nfaRerun orig [] (getFinalMatches ns) (VText (v:vs))  --todo : need to propagate the matches 
 nfaRun' _ ns (VText [])           = map (snd) (concat (map finalStateExt ns))
@@ -349,24 +349,30 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 -- >>> searchInVText ".*c" (toVtext "@1<ab@,@2<x@,z@>y@>@3<c@,l@>")
 -- [1<ab,2<x,z>y>3<c,>]
 --
+-- This is a tricky example. earlier ["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"]
 -- >>> searchInVText ".*c.*" (toVtext "@1<ab@,@2<x@,z@>c@>@3<c@,l@>")
--- ["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"]
+-- [1<ab,2<x,z>c>3<c,>,1<a,2<x,z>c>3<c,l>,1<a,2<x,z>c>3<c,>]
 --
--- | NFANode : (NFAChar 'a' (NFATable [] [NFATable [] [] [] True] [] True)
+-- | NFANode : (NFAChar 'a' (NFATable [] [NFATable [] [] [] True] [] True). earlier ["ab","ac"]
 -- >>> searchInVText "a.?" (toVtext "@1<ab@,@2<x@,z@>c@>")
--- ["ab","ac"]
+-- [1<ab,c>]
 --
+-- Earlier ["cm","lm"]
 -- >>> searchInVText ".?m" (toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
--- ["cm","lm"]
+-- [1<c,lm>]
 --
+-- Earlier ["ab","xb","zb"]
 -- >>> searchInVText ".?b" (toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
--- ["ab","xb","zb"]
+-- [1<ab,2<x,z>>]
 --
+-- ****earlier ["ab\nl","ay\nl"]. Should there be space instead of empty when there is no match? the result looks weird.
 -- >>> searchInVText "a.*l" (toVtext "@1<ab@,@2<x@,z@>y@>\n@1<cd@,lm@>\n@3<e@,n@>")
--- ["ab\nl","ay\nl"]
+-- [1<ab,y>
+-- 1<,l>]
 --
 -- | the langauge for Alt and subexpression needs "\\" in order to not match to the literal.
---   This is opposite to all the regex behaviours
+--   This is opposite to all the regex behaviours. Earlier ["ab\nl","zb\nl","ay\nl","zy\nl"]
 -- >>> searchInVText "\\(a\\|z\\).*l" (toVtext "@1<ab@,@2<x@,z@>y@>\n@1<cd@,lm@>\n@3<e@,n@>")
--- ["ab\nl","zb\nl","ay\nl","zy\nl"]
+-- [1<ab,2<,z>y>
+-- 1<,l>]
 
