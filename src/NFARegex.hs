@@ -48,12 +48,13 @@ vSearch regex file = do
    let Right vtext = e_vtext
    print ("VText :\n" ++ (show vtext))
    let matched = searchInVText regex vtext
-   print matched
+   let unified = map (unifyVText) matched
+   print unified
 
 searchInVText :: String -> VText -> [Match]
 searchInVText regex vtext = let vtext' = vSplit vtext
                                 acc = acceptor' (fst(head(nnRegexp regex)))
-                            in acc vtext'--unlines . filter acc . lines
+                            in map (unifyVText) (acc vtext')--unlines . filter acc . lines
  --figure out how to get the VText by filtering h
 
 parse_args :: [String] -> IO()
@@ -87,7 +88,7 @@ data NFANode
  	| NFAEnd  NFANode
  	| NFAFinal
 	| NFATable [(Char, NFANode)] [NFANode] [NFANode] Bool
-        deriving (Show)
+        deriving (Show,Eq)
 {-NFAChar c next	- a state with arc on character c to next state
 NFAAny next	- a state with arc on any character
 NFAEps nexts	- a state with a set of epsilon transitions
@@ -206,23 +207,54 @@ nfaRunNodes ns [] = (concat (map step ns))
 --step function for the NFA interpreter to accept VText
 --Note if epsilon compression is removed above, all {- epsClosure -} must 
 --be uncommented!
-type Match = String
+type Match = VText
 
 nfaStep' :: [(NFANode,Match)] -> VText -> [(NFANode,Match)]
-nfaStep' states (VText vs) = concatMap ( nfaStepSegment states) vs
+nfaStep' s      (VText [])     = s
+nfaStep' states (VText (v:vs)) = nfaStep' ( nfaStep1' states v) (VText vs)
 
-nfaStepSegment :: [(NFANode,Match)] -> Segment -> [(NFANode,Match)]
-nfaStepSegment states (Plain [c])                   = {- epsClosure -} concatMap (step c ) states
-nfaStepSegment states (Chc d (VText [Plain [c]]) v) = (concatMap (step c) states) ++ (nfaStep' states v) 
-nfaStepSegment states (Chc d v (VText [Plain [c]])) = concatMap (step c) states ++ (nfaStep' states v)
-nfaStepSegment states (Chc d v1 v2)                 = (nfaStep' states v1) ++ (nfaStep' states v2)
- 
-step :: Char -> (NFANode,Match) -> [(NFANode,Match)]
-step c (NFAChar c' n',m) | c == c'          = [(n',m++[c])]
-step c (NFAAny n',m)                        = [(n',m++[c])]
-step c (NFATable pairs anys ends finals,m)  = [ (n',m++[c]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,m++[c])) anys)
-step _ _                                    = []
+nfaStep1' :: [(NFANode,Match)] -> Segment -> [(NFANode,Match)]
+nfaStep1' states s = concatMap (step1 s) states
 
+{-nfaStepSegment :: [(NFANode,Match)] -> Segment -> [(NFANode,Match)]
+nfaStepSegment states s@(Plain [c])                   = {- epsClosure -} concatMap (step c s) states
+--nfaStepSegment states s@(Chc d (VText [Plain [c]]) v) = (concatMap (step c s) states) ++ (nfaStep' states v) 
+--nfaStepSegment states s@(Chc d v (VText [Plain [c]])) = concatMap (step c s) states ++ (nfaStep' states v)
+nfaStepSegment states (Chc d v1 v2)                   = appendVTexts m (VText [ Chc d (VText (nfaStep' states v1)) (VText (nfaStep' states v2))])
+ -}  
+
+step1 :: Segment ->  (NFANode,Match) -> [(NFANode,Match)]
+step1 (Plain "") _           = []
+step1 (Plain [c]) (node,m)   = let ms = step c node in updateMatch ms m
+step1 (Chc d v1 v2) s@(node,m) = let ms = nfaStep' [(node,VText[])] v1 
+                                     ms'= nfaStep' [(node,VText[])] v2
+                                 in updateMatchChc d ms ms' m 
+
+step :: Char -> NFANode -> [(NFANode,Match)]
+step c (NFAChar c' n') | c == c'          = [(n',VText [Plain [c]])]
+step c (NFAAny n')                        = [(n',VText [Plain [c]])]
+step c (NFATable pairs anys ends finals)  = [(n',VText [Plain [c]]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,VText [Plain [c]])) anys)
+step _ _                                  = []
+
+updateMatch :: [(NFANode,Match)] -> Match -> [(NFANode,Match)]
+updateMatch [] m           = []
+updateMatch ((n1,m1):ms) m = (n1,appendVTexts m m1) : updateMatch ms m
+
+updateMatchChc :: Dim -> [(NFANode,Match)] -> [(NFANode,Match)] -> Match -> [(NFANode,Match)]
+updateMatchChc _ [] [] _   = []
+updateMatchChc d ms [] m   = map (\(n',m') -> (n', appendVTexts m (VText [Chc d m' (VText [])]))) ms
+updateMatchChc d [] ms m   = map (\(n',m') -> (n', appendVTexts m (VText [Chc d (VText []) m']))) ms
+updateMatchChc d ((nl,ml):msL) ((nr,mr):msR) m  -- (nl == nr)  = (nl,appendVTexts m (VText [Chc d ml mr])) : updateMatchChc d msL msR m
+  | (length $ finalStateExt (nl,ml)) > 0 
+      && (length $ finalStateExt (nr,mr)) == 0 =  (nl,appendVTexts m (VText [Chc d ml mr])) 
+                                                    : updateMatchChc d msL msR m--Identify such a case : searchInVText ".*c" (toVtext "@3<c@,l@>").
+  | (length $ finalStateExt (nr,mr)) > 0 
+      && (length $ finalStateExt (nl,ml)) == 0 = (nr,appendVTexts m (VText [Chc d ml mr])) 
+                                                    : updateMatchChc d msL msR m
+  | (length $ finalStateExt (nl,ml)) > 0 
+      && (length $ finalStateExt (nr,mr)) > 0  = (nl,appendVTexts m (VText [Chc d ml mr])) 
+                                                    : updateMatchChc d msL msR m--since both are successfull, doesnt matter which final node we pick
+  | otherwise = [(nl,appendVTexts m (VText [Chc d ml mr]))] ++ updateMatchChc d msL msR m -- here it doesnt matter which node you take since both are created out of same and if both havent been temrminated, they ought to be the same. Cannot use == here because * or + will have to be fully evaluated (nl == nr)
 
 acceptor' :: NFAproducer -> VText -> [Match]
 acceptor' nfa vtext = nfaRunSkipBegin (nfa nfaFinal) vtext --nfaRun' ( {- epsClosure -} [(nfa nfaFinal,"")]) vtext
@@ -257,8 +289,8 @@ finalStateExt _                                   = []
 nfaRunSkipBegin :: NFANode -> VText -> [Match]
 nfaRunSkipBegin n (VText [])                      = [] --no matches in this iteration
 nfaRunSkipBegin n vt@(VText (v:vs)) 
-  | (length $ nfaStep' [(n,"")] (VText [v])) == 0 = nfaRunSkipBegin n (VText vs)
-  | otherwise                                     = nfaRun' n [(n,"")] vt
+  | (length $ nfaStep' [(n,VText[])] (VText [v])) == 0 = nfaRunSkipBegin n (VText vs)
+  | otherwise                                     = nfaRun' n [(n,VText[])] vt
 
 --Check if the end transition has reached. 
 nfaRerun :: NFANode -> [(NFANode,Match)] -> [Match] -> VText -> [Match]
@@ -282,23 +314,23 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 
 -- | Doctests - searchInVText returns a pair of boolean and the matched string
 -- >>> searchInVText "a" (toVtext "a")
--- ["a"]
+-- [a]
 --
 -- | Fixed. Now matches substring
 -- >>> searchInVText "a" (toVtext "ab")
--- ["a"]
+-- [a]
 --
 -- >>> searchInVText "a" (toVtext "@1<a@,b@>")
--- ["a"]
+-- [1<a,>]
 --
 -- >>> searchInVText "a" (toVtext "@1<a@,a@>")
--- ["a","a"]
+-- [1<a,a>]
 --
 -- >>> searchInVText "xy" (toVtext "@1<ab@,xy@>")
--- ["xy"]
+-- [1<,xy>]
 --
 -- >>> searchInVText "ay" (toVtext "@1<ab@,xy@>")
--- ["ay"]
+-- [1<a,y>] 
 --
 -- | Following doesnot match because 'a' and 'x' are characters in the same place 
 --   and therefore cannot occur beside each other in 1<ab,xy>
@@ -309,13 +341,13 @@ showS (Chc d v1 v2)  = "(Chc " ++ (show d) ++ "(" ++ showV v1 ++ ") (" ++ showV 
 -- []
 --
 -- >>> searchInVText "zb" (toVtext "@1<ab@,@2<x@,z@>y@>")
--- ["zb"]
+-- [1<b,2<,z>>]
 --
 -- >>> searchInVText "a.c" (toVtext "@1<ab@,@2<x@,z@>y@>c")
--- ["abc","ayc"]
+-- [1<ab,y>c]
 --
 -- >>> searchInVText ".*c" (toVtext "@1<ab@,@2<x@,z@>y@>@3<c@,l@>")
--- ["abc","xbc","zbc","ayc","xyc","zyc"]
+-- [1<ab,2<x,z>y>3<c,>]
 --
 -- >>> searchInVText ".*c.*" (toVtext "@1<ab@,@2<x@,z@>c@>@3<c@,l@>")
 -- ["abc","xbc","zbc","acc","acc","xcc","xcc","zcc","zcc","acl","xcl","zcl"]
