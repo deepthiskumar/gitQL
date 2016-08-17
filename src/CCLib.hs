@@ -12,7 +12,7 @@ module CCLib where
   import Pretty
   --import Data.Vector.Unboxed as Uvector  hiding ((++),concat,length,tail,map,take,drop,concatMap,maximum,reverse)
 
-  escape = "@"--"ⱺ"
+  escape = "ⱺ" --"@"-- 
 
   data Sel = LSel !Int | RSel !Int
   type Selection = [Sel]

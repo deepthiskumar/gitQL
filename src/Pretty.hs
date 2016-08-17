@@ -4,7 +4,7 @@ module Pretty (showChc,showChcNoColor) where
 import Data.List (intersperse)
 
 --Escape sequence for choices
-escape = ""--"ⱺ"
+escape = "ⱺ" --""
 ---------------------
 -- Pretty Printing --
 ---------------------
