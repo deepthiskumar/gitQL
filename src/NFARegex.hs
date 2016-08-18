@@ -243,15 +243,16 @@ nfaStep1' b dimVar states s = concatMap (step1 b dimVar s) states
 
 step1 :: Branch -> String -> Segment -> (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)] --step1 _ (Plain "") n@((NFATable choices pairs anys ends finals),m,e) = map (\a -> (a,m,e)) anys
 step1 _ _ (Plain "") n@(node,m,e)        = let ms = checkZeroOrMore (n) in updateMatch ms m --TODO allow in case of ? , * or +
-step1 _ _ (Plain [c]) (node,m,e)         = let ms = step c node in updateMatch (map (\(n,m) -> (n,m,e)) ms) m
+step1 _ _ (Plain [c]) n@(node,m,e)       = step c n
 step1 b dimVar c@(Chc d v1 v2) n         = matchVRegex b dimVar c n
 step1 _ _ _ _                            = undefined
 
-step :: Char -> NFANode -> [(NFANode,Match)]
-step c (NFAChar c' n') | c == c'          = [(n',VText [Plain [c]])]
-step c (NFAAny n')                        = [(n',VText [Plain [c]])]
-step c (NFATable choices pairs anys ends finals)  = [(n',VText [Plain [c]]) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,VText [Plain [c]])) anys) -- TODO how the choices here needs to handled
-step _ _                                  = []
+step :: Char -> (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)]
+step c (NFAChar c' n',m,e) | c == c'          = [(n',appendVTexts m (VText [Plain [c]]),e)]
+step c (NFAAny n',m,e)                        = [(n',appendVTexts m (VText [Plain [c]]),e)]
+step c (NFATable choices pairs anys ends finals,m,e)  = [(n',appendVTexts m (VText [Plain [c]]),e) | (c',n') <- pairs, c == c' ] ++ (map (\n -> (n,appendVTexts m (VText [Plain [c]]),e)) anys) -- TODO how the choices here needs to handled
+step c n@(NFAChc d (n1, n2) ms next,m,e)      = concatMap (matchRight n (Plain [c])) (nfaStep1' BB "" [(n1,VText[],e)] (Plain [c]))
+step _ _                                      = []
 
 --epsilon transitions
 checkZeroOrMore :: (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)]
@@ -263,7 +264,6 @@ checkZeroOrMore _                                                  = []
 
 
 matchVRegex :: Branch -> String -> Segment -> (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)]
-matchVRegex b dimVar (Plain _) n           = []
 matchVRegex BB dimVar s n@((NFAChc d (n1,n2) ms next),m,e) -- first appearance of the choice regex
                | matchDim d s       =  concatMap (matchRight n s) (applyVRegex BL s (getDimVD d ) (n1,VText [],e))
                | otherwise          = []
@@ -599,6 +599,17 @@ testSearch nfa file = do
 -- >>> testVregex (NFAChc (VD "d1") (nfa "ab",nfa ".*") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "@1<abc@,l@>")
 -- [(1<a,l>1<b,>,[("d1",[1])])]
 --
--- 
+-- testVregex (NFAChar 'x' (NFAChc (VD "d1") (nfa "ayz",nfa "lyz") ([VText []]) (NFAFinal)) ) (vSplit $ toVtext "xⱺ1<aⱺ,lⱺ>yz")
+-- [(xⱺ1<aⱺ,lⱺ>yz,[("d1",[1])])]
+-- testVregex (NFAChar 'x' (NFAChc (VD "d1") (nfa "ay",nfa "ly") ([VText []]) (NFAChar 'z' NFAFinal)) ) (vSplit $ toVtext "xⱺ1<aⱺ,lⱺ>yz")
+-- [(xⱺ1<aⱺ,lⱺ>yz,[("d1",[1])])]
+-- testVregex (NFAChar 'x' (NFAChc (VD "d1") (nfa "ay",nfa "ly") ([VText []]) (NFAFinal)) ) (vSplit $ toVtext "xⱺ1<aⱺ,lⱺ>yz")
+-- [(xⱺ1<aⱺ,lⱺ>y,[("d1",[1])])]
+-- testVregex (NFAChar 'x' (NFAChc (VD "d1") (nfa "amny",nfa "lmpy") ([VText []]) (NFAFinal)) ) (vSplit $ toVtext "xⱺ1<aⱺ,lⱺ>mⱺ1<nⱺ,pⱺ>yz")
+-- [(xⱺ1<aⱺ,lⱺ>mⱺ1<nⱺ,pⱺ>y,[("d1",[1])])]
+-- testVregex (NFAChc (VD "d1") (nfa "xamny",nfa "xlmpy") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "xⱺ1<aⱺ,lⱺ>mⱺ1<nⱺ,pⱺ>y")
+-- [(xⱺ1<aⱺ,lⱺ>mⱺ1<nⱺ,pⱺ>y,[("d1",[1])])]
+-- testVregex (NFAChc (VD "d1") (nfa "xamny",nfa "xlmpy") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "xxⱺ1<aⱺ,lⱺ>mⱺ1<nⱺ,pⱺ>yz")
+-- [] * should not be empty
 -- Choice with NFATable
 
