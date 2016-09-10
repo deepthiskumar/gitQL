@@ -24,6 +24,7 @@ showChcNoColor d es = escape ++ show d ++ bracketsNoColor (commasNoColor es)
 
 --
 -- Color & style definitions
+-- Doesn't work on Windows.
 --
 
 reset = "\27[0m"
