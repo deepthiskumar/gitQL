@@ -2,9 +2,9 @@ module VText where
 
 {-
 
-This module VText presents a representation for variational text. This does
-not directly employ the V type constructor, because it required one
-more indirection that would have complicated function unnecessarily.
+VText is a representation for variational text. This does not directly
+employ the V type constructor, because it required one more
+indirection that would have complicated function unnecessarily.
 
   newtype VText = VText [Segment]
   data Segment = Plain Text | Chc Dim VText VText
