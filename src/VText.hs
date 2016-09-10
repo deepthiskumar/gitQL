@@ -77,17 +77,19 @@ plain t = VText [Plain t]
 change :: Dim -> Text -> Text -> Segment
 change d old new = Chc d (plain old) (plain new)
 
--- Computing dependencies and collecting them in an edit tree
+-- Variant predicates
 --
+-- This is synonymous with `not (isPlain x)`
 isChoice :: Segment -> Bool
 isChoice (Chc _ _ _) = True
 isChoice _           = False
 
+-- This is synonymous with `not (isChoice x)`
 isPlain :: Segment -> Bool
 isPlain (Plain _) = True
 isPlain _ = False
 
--- get all dimensions
+-- Get all dimensions
 allDimensions :: VText -> [Dim]
 allDimensions (VText [])     = []
 allDimensions (VText (x:xs)) = case x of
