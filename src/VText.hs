@@ -83,6 +83,9 @@ isChoice :: Segment -> Bool
 isChoice (Chc _ _ _) = True
 isChoice _           = False
 
+isPlain :: Segment -> Bool
+isPlain (Plain _) = True
+isPlain _ = False
 
 -- get all dimensions
 allDimensions :: VText -> [Dim]
