@@ -9,22 +9,6 @@ indirection that would have complicated function unnecessarily.
   newtype VText = VText [Segment]
   data Segment = Plain Text | Chc Dim VText VText
 
-This file also contains a representation for the dependencies of (linear,
-non-branching) edits.
-
-  type Edits = [EditTree]
-  data EditTree = ET Dim Edits
-
-The edit dependencies can be computed from a variational text using the
-following function.
-
-  edits :: VText -> Edits
-
-Finally, the revertible commits can be obtained by finding all leaves of the
-edit tree that are not also internal nodes.
-
-  revertible :: VText -> [Dim]
-
 What is missing are functions to produce VText from a github repository. At
 the core should be a function:
 
@@ -93,50 +77,12 @@ plain t = VText [Plain t]
 change :: Dim -> Text -> Text -> Segment
 change d old new = Chc d (plain old) (plain new)
 
--- Linear (i.e., non-branching) edit dependencies
---
--- Representation of dependencies as a rose tree called "edit tree":
--- If edit l directly applies to a variant produced by edit k,
--- then we have the node "ET k [...,l, ...]" in the tree.
--- Indirect dependencies are represented by paths in the tree.
---
-type Edits = [EditTree]
-data EditTree = ET Dim Edits
-
-instance Show EditTree where
-  show (ET d [])  = show d
-  show (ET d [e]) = show d++"<"++show e
-  show (ET d es)  = show d++"<"++show es
-
-
--- partitioning of nodes into internal nodes and leaves
---
-part :: EditTree -> ([Dim],[Dim])
-part (ET d []) = ([],[d])
-part (ET d es) = (d:is,ls) where (is,ls) = parts es
-
-parts :: Edits -> ([Dim],[Dim])
-parts = pair concat . unzip . map part
-        where pair f (x,y) = (f x,f y)
-
-nodes :: EditTree -> [Dim]
-nodes = uncurry (++) . part
-
-leaves :: EditTree -> [Dim]
-leaves = snd . part
-
-
 -- Computing dependencies and collecting them in an edit tree
 --
 isChoice :: Segment -> Bool
 isChoice (Chc _ _ _) = True
 isChoice _           = False
 
-edits :: VText -> Edits
-edits (VText ss) = [editTree s | s <- ss, isChoice s]
-
-editTree :: Segment -> EditTree
-editTree (Chc d _ v) = ET d (edits v)
 
 -- get all dimensions
 allDimensions :: VText -> [Dim]
@@ -144,10 +90,3 @@ allDimensions (VText [])     = []
 allDimensions (VText (x:xs)) = case x of
   Plain _     -> allDimensions (VText xs)
   Chc d v1 v2 -> d : (allDimensions v1) ++ (allDimensions v2) ++ (allDimensions (VText xs))
-
--- revertible commits
--- (= all leaves of the edit tree that are not also internal nodes)
---
-revertible :: VText -> [Dim]
-revertible v = (nub ls) \\ is
-               where (is,ls) = parts (edits v)

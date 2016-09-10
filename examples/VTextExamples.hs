@@ -7,6 +7,7 @@ Example for VText.  Illustrates the use of the representation.
 -}
 
 import VText
+import Edits
 
 -- Example
 --
