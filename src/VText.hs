@@ -9,9 +9,8 @@ indirection that would have complicated function unnecessarily.
   newtype VText = VText [Segment]
   data Segment = Plain Text | Chc Dim VText VText
 
-This file contains an example that illustrates the use of the representation.
-Ultimately, this should be moved into a testing module. This file also contains
-a representation for the dependencies of (linear, non-branching) edits.
+This file also contains a representation for the dependencies of (linear,
+non-branching) edits.
 
   type Edits = [EditTree]
   data EditTree = ET Dim Edits
@@ -94,40 +93,6 @@ plain t = VText [Plain t]
 change :: Dim -> Text -> Text -> Segment
 change d old new = Chc d (plain old) (plain new)
 
-
--- Example
---
--- root is the original document
--- edit A changes "two" to "1 + 1"
--- edit B changes the first "1" in "1 + 1" to "One" and add "four" at the end
--- edit C changes "One" to "ONE" and "1" to "I"
---
-root :: Text
-root = "one two three"
-
-a :: VText
-a = VText [Plain "one ",
-           Chc 1 (plain "two") (plain "1 + 1"),
-           Plain " three"]
-
-b :: VText
-b = VText [Plain "one ",
-           Chc 1 (plain "two")
-                 (VText [Chc 2 (plain "1") (plain "One"),
-                         Plain " + 1"]),
-           Plain " three",
-           Chc 2 (plain "") (plain " four")]
-
-c :: VText
-c = VText [Plain "one ",
-           Chc 1 (plain "two")
-                 (VText [Chc 2 (plain "1") (VText [Chc 3 (plain "One") (plain "ONE")]),
-                         Plain " + ",
-                         Chc 3 (plain "1") (plain "I")]),
-           Plain " three",
-           Chc 2 (plain "") (plain " four")]
-
-
 -- Linear (i.e., non-branching) edit dependencies
 --
 -- Representation of dependencies as a rose tree called "edit tree":
@@ -186,12 +151,3 @@ allDimensions (VText (x:xs)) = case x of
 revertible :: VText -> [Dim]
 revertible v = (nub ls) \\ is
                where (is,ls) = parts (edits v)
-
-
--- Continuing the example ...
---
-edits_c :: Edits
-edits_c = edits c
-
-revertible_c :: [Dim]
-revertible_c = revertible c
