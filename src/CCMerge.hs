@@ -54,7 +54,7 @@ partialDecision [] (VText [])                   = VText []
 partialDecision [] v                            = v
 partialDecision ss (VText [])                   = VText []
 partialDecision (ss) (VText (Plain a :vs))      = (VText [Plain a]) `appendVTexts` partialDecision ss (VText vs)
-partialDecision (ss) (VText (c@(Chc d l r) : vs)) = case getSelection d ss of 
+partialDecision (ss) (VText (c@(Chc d l r) : vs)) = case getSelection d ss of
  Just L  -> applyDecision ss l `appendVTexts` partialDecision ss (VText vs)
  Just R  -> applyDecision ss r `appendVTexts` partialDecision ss (VText vs)
  Nothing -> VText [Chc d (partialDecision ss l) (partialDecision ss r)]   `appendVTexts` partialDecision ss (VText vs)
@@ -86,13 +86,13 @@ getSelection d ((RSel d'):ss) = if d == d' then Just R else d `getSelection` ss
 -- a2<b,y>
 -- >>>partialDecision  [LSel 1] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y") ])
 -- man2<b,y>
--- >>>partialDecision  [RSel 1,RSel 2] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y")]) 
+-- >>>partialDecision  [RSel 1,RSel 2] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y")])
 -- m3<x,z>ny
 -- >>>partialDecision  [RSel 3,RSel 2] (VText [Plain "m",Chc 1 (plain "a") (VText[Chc 3 (plain "x") (plain "z")]),Plain "n",Chc 2 (plain "b") (plain "y")])
 -- m1<a,z>ny
 
 ---------------------------------------------------------------------------------------
-{-To identify if the actual changes made by the user in the merge commit corresponds 
+{-To identify if the actual changes made by the user in the merge commit corresponds
   to the changes present in either of the branches.
   The function takes 1) merged VText: ccmerge between both the branches before taking the merged commit
                      2) next VText: VText after applying the merged changes to its CC exp (the one without the merge )
@@ -106,7 +106,7 @@ patchCC m n = let m' = agressiveSplit m
               in compareChanges m' n'
 
 compareChanges :: VText -> VText -> (VText,Selection)
-compareChanges (VText (m:ms)) (VText (n:ns)) 
+compareChanges (VText (m:ms)) (VText (n:ns))
    | m == n    = case compareChanges (VText ms) (VText ns) of (v,ss) -> (VText [m] `appendVTexts` v, ss)
    | otherwise = case (m,n) of
      (Plain a, Plain b)                    -> if a == b then case compareChanges (VText ms) (VText ns) of (v,ss) -> (plain a `appendVTexts` v, ss) else undefined --if plain then both should be same
@@ -117,7 +117,7 @@ compareChanges (VText (m:ms)) (VText (n:ns))
      (c@(Chc d l r), Plain a)              -> case compareChanges (VText ms) (VText ns) of (v,ss) -> (VText [c] `appendVTexts` v, ss) --l should have a, get selection from merge
      (c1@(Chc d1 l1 r1),c2@(Chc d2 l2 r2)) -> case d1 == d2 of
        True   -> case (compareChanges l1 l2, compareChanges r1 r2) of
-                  ((v1,ss1),(v2,ss2)) -> case compareChanges (VText ms) (VText ns) of (v,ss) -> (VText [Chc d1 v1 v2] `appendVTexts` v, ss) 
+                  ((v1,ss1),(v2,ss2)) -> case compareChanges (VText ms) (VText ns) of (v,ss) -> (VText [Chc d1 v1 v2] `appendVTexts` v, ss)
        False  -> case l1 == l2 of --something different added by the user since if L is same but R is diff otherwise same as one of the branches (which is handled by above patterns)
         True -> case (r1,r2) of
          (VText[Plain a],VText[Plain b]) -> case compareChanges (VText ms) (VText ns) of (v,ss) -> (VText[Chc d1 l1 (VText[Chc d2 (plain a) (plain b)])] `appendVTexts` v, (RSel d1) : ss)
@@ -136,7 +136,7 @@ getPlainChar []     = [Plain ""]
 getPlainChar [x]    = [Plain [x]]
 getPlainChar (x:xs) = Plain [x] : getPlainChar xs
 
--- 
+--
 -- >>> vSplit (VText [Plain "abc"])
 -- abc
 --

@@ -60,13 +60,13 @@ instance Show VText where
 instance Show Segment where
   show (Plain t)     = t
   show (Chc d v v') = showChcNoColor d (map show [v,v'])
-  
+
 {-instance Show VText where
   show = showV
 
 instance Show Segment where
   show = showS
-  
+
 
 --show VText as is
 showV :: VText -> String

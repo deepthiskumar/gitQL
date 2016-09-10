@@ -4,7 +4,7 @@ import VText
 import Text.Regex
 import CCLib
 
---for main function 
+--for main function
 import Prelude hiding (readFile)
 import System.IO.Strict (readFile)
 import System.Environment (getArgs)
@@ -24,7 +24,7 @@ match pat ((v,s):vs) = case matchRegexAll pat v of
                     Just (bef,matchStr,after,subexp) -> matchStr : match pat vs
                     Nothing                          -> match pat vs
 
---get all the view decisions in th eorder of edits. As of now undo or redo 
+--get all the view decisions in th eorder of edits. As of now undo or redo
 --scenarios are not included
 --get all the dimensions using CCLib.dimensions and order them in ascending
 viewDecisions :: [Int] -> [Selection]
@@ -35,9 +35,9 @@ getSelections [] _       = []
 getSelections (d:ds) ds' = getSelection d ds' : getSelections ds ds'
 
 getSelection :: Int -> [Int] -> Selection
-getSelection x ds = (map RSel (fst $ break (> x) ds)) ++ 
+getSelection x ds = (map RSel (fst $ break (> x) ds)) ++
         (map LSel (snd $ break (> x) ds))
-        
+
 
 applyVD :: [Selection] -> VText -> [(Variant, Selection)]
 applyVD ss v = map (getVariant v) ss
@@ -50,7 +50,7 @@ getVariant v s = (applySelection s v,s)
 --matchRegex r ((v,s):vs) = matchRegexAll r v
 
 func :: String -> IO()
-func file = do 
+func file = do
    --args <- getArgs
    --let file = head args
    vsource <- readFile file
@@ -61,8 +61,8 @@ func file = do
    print vtext
    let res = vgrep1 "x" vtext
    print res
-   
-   
+
+
 stripNewline :: [Char] -> [Char]
 stripNewline []                 = []
 stripNewline ('\n' :[])         = []
