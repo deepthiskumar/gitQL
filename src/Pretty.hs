@@ -41,7 +41,7 @@ purple = attrFG 5
 cyan   = attrFG 6
 white  = attrFG 7
 
-colors = map (++bold) [green,red,blue,yellow,purple,cyan]
+colors = map (++bold) [green, red, blue, yellow, purple, cyan]
 
 defaultColor = black ++ reset
 

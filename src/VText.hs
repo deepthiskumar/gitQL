@@ -1,4 +1,3 @@
-
 module VText where
 
 {-
@@ -34,9 +33,9 @@ the core should be a function:
 
 -}
 
-import Pretty (showChc,showChcNoColor)
+import Pretty (showChc, showChcNoColor)
 
-import Data.List ((\\),nub)
+import Data.List ((\\), nub)
 
 
 type Dim = Int
