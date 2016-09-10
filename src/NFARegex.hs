@@ -12,7 +12,7 @@ import CCLib
 infixr 8 +.+ , +.. , ..+
 infixl 7 <<< , <<*
 infixr 6 |||
- 
+
 (+.+) = thn
 (..+) = xthn
 (+..) = thnx
@@ -65,7 +65,7 @@ showResult ((m,d):rs) = "Match: " ++ (show m) ++ " Dimension Variable : "++ (sho
 parse_args :: [String] -> IO()
 parse_args (regexp: file : []) = do
 	let acc = acceptor (fst(head(nnRegexp regexp)))
-	let acc' = unlines . filter acc . lines 
+	let acc' = unlines . filter acc . lines
 	text <- F.readFile $ file
 	print (acc' text )
 parse_args _ = putStr ("Incorrect Usage: regexp\n") --hPutStr stderr ("Usage: regexp\n")
@@ -73,7 +73,7 @@ parse_args _ = putStr ("Incorrect Usage: regexp\n") --hPutStr stderr ("Usage: re
 parse_args' :: [String] -> IO()
 parse_args' (regexp: file : []) = do
 	let acc = acceptor (fst(head(nnRegexp regexp)))
-	let acc' = unlines . filter acc 
+	let acc' = unlines . filter acc
 	text <- F.readFile $ file
 	print (acc' [text] )
 parse_args' _ = putStr ("Incorrect Usage: regexp\n") --hPutStr stderr ("Usage: regexp\n")
@@ -86,7 +86,7 @@ parse_args' _ = putStr ("Incorrect Usage: regexp\n") --hPutStr stderr ("Usage: r
   Regexp	= Factor / "\\|" ["$"].
 -}
 
-data NFANode 
+data NFANode
       	= NFAChar Char NFANode
  	| NFAAny  NFANode
 	| NFAEps  [NFANode]
@@ -134,10 +134,10 @@ nfaEps  = mkTable [] [] [] [] False . epsClosure
 nfaEnd  = NFAEnd
 nfaFinal= NFAFinal
 
---just wrappers for the NFANode constructors, 
+--just wrappers for the NFANode constructors,
 --modified such that epsilon transitions are compressed into tables
 
-mkTable choices pairs anys ends final []      = NFATable choices pairs anys ends final 
+mkTable choices pairs anys ends final []      = NFATable choices pairs anys ends final
 mkTable choices pairs anys ends final (NFAChar c n:ns) = mkTable choices ((c,n):pairs) anys ends final ns
 mkTable choices pairs anys ends final (NFAAny n:ns) = mkTable choices pairs (n:anys) ends final ns
 mkTable choices pairs anys ends final (NFATable choices' pairs' anys' ends' final':ns) = mkTable (choices'++choices) (pairs'++pairs) (anys'++anys) (ends'++ends) (final' || final) ns
@@ -145,7 +145,7 @@ mkTable choices pairs anys ends final (NFAEnd n:ns) = mkTable choices pairs anys
 mkTable choices pairs anys ends final (NFAFinal:ns) = mkTable choices pairs anys ends True ns
 mkTable choices pairs anys ends final ((NFAChc d (n1,n2) ms next) : ns) = mkTable (NFAChc d (n1,n2) ms next : choices) pairs anys ends final ns
 mkTable _ _ _ _ _ _ = error "illegal argument to mkTable"
- 
+
 type NFAproducer = NFANode -> NFANode
 
 --An NFAproducer takes a final state and produces the initial state of a
@@ -174,7 +174,7 @@ nnExtAtom =
       where
         helper (ea, []) = ea
         helper (ea, [f]) = f ea
- 
+
 nnFactor :: Parser Char NFAproducer
 nnFactor =
       plus nnExtAtom	<<< foldr (.) id
@@ -189,7 +189,7 @@ nnRegexp =
 	combine f1 f2 final = nfaEps [f1 final, f2 final]
 
 --Step function for the NFA interpreter.
---Note if epsilon compression is removed above, all {- epsClosure -} must 
+--Note if epsilon compression is removed above, all {- epsClosure -} must
 --be uncommented!
 
 nfaStep states c = {- epsClosure -} (concat (map step states))
@@ -229,9 +229,9 @@ nfaRunNodes ns [] = (concat (map step ns))
      step (NFATable choices pairs anys ends True) = [NFAFinal]
      step (NFATable choices pairs anys ends finals) = ends
      step _           = []
-     
+
 --step function for the NFA interpreter to accept VText
---Note if epsilon compression is removed above, all {- epsClosure -} must 
+--Note if epsilon compression is removed above, all {- epsClosure -} must
 --be uncommented!
 
 nfaStep' :: Branch -> String -> [(NFANode,Match,DimEnv)] -> VText -> [(NFANode,Match,DimEnv)]
@@ -273,7 +273,7 @@ matchVRegex BL dimVar s (NFAChc d (n1,n2) ms next,m,e)
 matchVRegex BR dimVar s (NFAChc d (n1,n2) ms next,m,e)
                | matchDim d s       = let ms' = applyVRegex BR s (getDimVD d ) (n2,m,e) in map (\(n',m',e')-> (n',m',{-updateDimEnv d s -}e')) ms'
                | otherwise          = [(n2,m,e)]
-matchVRegex b dimVar s (NFATable choices p a e' final,m,e) = (nfaStep' b dimVar (map (\ch -> (ch,m,e)) choices) (VText [s])) ++ (applyVRegex b s dimVar (NFATable [] p a e' final,m,e)) 
+matchVRegex b dimVar s (NFATable choices p a e' final,m,e) = (nfaStep' b dimVar (map (\ch -> (ch,m,e)) choices) (VText [s])) ++ (applyVRegex b s dimVar (NFATable [] p a e' final,m,e))
 matchVRegex b dimVar s n                   = applyVRegex b s dimVar n
 
 getDimVD :: DimEx -> String
@@ -282,11 +282,11 @@ getDimVD (VD d)   = d
 
 --MatchRight -> current choice regex -> next node from left regex.
 matchRight :: (NFANode,Match,DimEnv) -> Segment -> (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)]
-matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s curr@(NFAEnd n', m',e)  = let ms' = concatMap (nfaStep' BR (getDimVD d ) [(n2,VText[],e)]) (appendMatch ms m') -- Right side might not match for example in the case of <0,NULL> 
+matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s curr@(NFAEnd n', m',e)  = let ms' = concatMap (nfaStep' BR (getDimVD d ) [(n2,VText[],e)]) (appendMatch ms m') -- Right side might not match for example in the case of <0,NULL>
                                                                           in returnMatch n s curr ms'
-matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s curr@(NFAFinal,m',e)  = let ms' = concatMap (nfaStep' BR (getDimVD d ) [(n2,VText[],e)]) (appendMatch ms m') 
+matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s curr@(NFAFinal,m',e)  = let ms' = concatMap (nfaStep' BR (getDimVD d ) [(n2,VText[],e)]) (appendMatch ms m')
                                                                         in returnMatch n s curr ms'
-matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s n'@((NFATable c p a e' True),m',e) = 
+matchRight n@(NFAChc d (_,n2) ms next,m,eOld) s n'@((NFATable c p a e' True),m',e) =
   let ms' = concatMap (nfaStep' BR (getDimVD d ) [(n2,VText[],e)]) (appendMatch ms m')
   in case ms' of
     []        -> [(NFAChc d ((NFATable c p a e' True),n2) ms next , m,e) ] --No Match so return
@@ -303,7 +303,7 @@ checkFinalAndReturn (NFAChc d (_,n2) ms next,m,eOld) s (curr,m',e) (n'',m'',e'')
 
 returnMatch ::  (NFANode,Match,DimEnv) -> Segment -> (NFANode,Match,DimEnv) ->  [(NFANode,Match,DimEnv)] -> [(NFANode,Match,DimEnv)]
 returnMatch _ _ _ []                         = [] --failed match
-returnMatch n@(NFAChc d (_,n2) ms next,m,eOld) s n'@(curr,m',e) ((n'',m'',e''):ms'') 
+returnMatch n@(NFAChc d (_,n2) ms next,m,eOld) s n'@(curr,m',e) ((n'',m'',e''):ms'')
   | not $ null $ finalStateExt (n'',m'',e'') = (next,appendVTexts m m'',{-updateDimEnv d s-} e'') : returnMatch n s n' ms''
   | otherwise                                = (NFAChc d (curr,n2) (appendMatch ms m') next , m,e) : returnMatch n s n' ms''--let regex will be final, but will accept empty inputs in order to match the right regex
 
@@ -313,15 +313,15 @@ appendMatch [m] m'    = [appendVTexts m m']
 appendMatch (m:ms) m' = appendVTexts m m' : appendMatch ms m'
 
 applyVRegex :: Branch -> Segment -> String -> (NFANode,Match,DimEnv) -> [(NFANode,Match,DimEnv)] -- returns matched dimensions
-applyVRegex BB (Chc d v1 v2) dimVar s@(node,m,e)  = let ms = nfaStep' BB dimVar [(node,VText[],e)] v1 
+applyVRegex BB (Chc d v1 v2) dimVar s@(node,m,e)  = let ms = nfaStep' BB dimVar [(node,VText[],e)] v1
                                                         ms'= nfaStep' BB dimVar [(node,VText[],e)] v2
                                                     in updateMatchChc d ms ms' m --return []. Doesnot come under NFAChc
 applyVRegex BL (Chc d v1 v2) dimVar s@(node,m,e)  = let ms = nfaStep' BL dimVar [(node,VText[],e)] v1 --return d
-                                                    in case ms of 
+                                                    in case ms of
                                                        []        -> map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d (VText []) m']),e')) (nfaStep' BL dimVar [s] v2) --match d in v2.
                                                        otherwise -> map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d m' v2]),searchAndupdate dimVar d e')) (ms)
 applyVRegex BR (Chc d v1 v2) dimVar s@(node,m,e)  = let ms = nfaStep' BR dimVar [(node,VText[],e)] v2 --return d
-                                                    in case ms of 
+                                                    in case ms of
                                                       []        -> map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d m' (VText [])]),e')) (nfaStep' BR dimVar  [s] v1) -- matches left alternative of plain expression thereby causing an unintended match. Eg vgrep1 (d<b,.*>) (1<b,z>). use the dim in v1 and no the outer c. Delete the dimension if right doesnt match
                                                       otherwise -> map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d v1 m']),{-searchAndupdate dimVar d-} e')) ms
 applyVRegex _ _ _ _                        = []
@@ -335,14 +335,14 @@ matchDim (VD d) s               = True --TODO how to track the dimension variabl
 updateDimEnv :: DimEx -> Segment -> DimEnv -> DimEnv
 updateDimEnv _ (Plain _) es        = es
 updateDimEnv (Dim _) _ es          = es
-updateDimEnv (VD s) (Chc d _ _) es = searchAndupdate s d es 
+updateDimEnv (VD s) (Chc d _ _) es = searchAndupdate s d es
 
 searchAndupdate :: String -> Int -> DimEnv -> DimEnv
 searchAndupdate "" _ e     = e
 searchAndupdate s d []     = [(s,[d])]
-searchAndupdate s d (e@(s',vs):es) 
- | s == s'     = (s,nub(d:vs)):es 
- | otherwise   = e:searchAndupdate s d es 
+searchAndupdate s d (e@(s',vs):es)
+ | s == s'     = (s,nub(d:vs)):es
+ | otherwise   = e:searchAndupdate s d es
 
 appendDimEnvs :: DimEnv -> DimEnv -> DimEnv
 appendDimEnvs [] []   = []
@@ -352,8 +352,8 @@ appendDimEnvs (e1:es1) es2 = appendDimEnvs es1 (appendDimEnv e1 es2)
 
 appendDimEnv :: (String,[Int]) -> DimEnv -> DimEnv
 appendDimEnv (s,vs) []                 = [(s,vs)]
-appendDimEnv e@(s,vs) (e'@(s',vs'):es) 
-  | s ==s'    = (s,nub(vs++vs')):es 
+appendDimEnv e@(s,vs) (e'@(s',vs'):es)
+  | s ==s'    = (s,nub(vs++vs')):es
   | otherwise = e' : appendDimEnv e es
 
 getDim :: Segment -> Maybe Int
@@ -369,14 +369,14 @@ updateMatchChc _ [] [] _   = []
 updateMatchChc d ms [] m   = map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d m' (VText [])]),e')) ms
 updateMatchChc d [] ms m   = map (\(n',m',e') -> (n', appendVTexts m (VText [Chc d (VText []) m']),e')) ms
 updateMatchChc d ((nl,ml,el):msL) ((nr,mr,er):msR) m  -- (nl == nr)  = (nl,appendVTexts m (VText [Chc d ml mr])) : updateMatchChc d msL msR m
-  | (length $ finalStateExt (nl,ml,el)) > 0 
+  | (length $ finalStateExt (nl,ml,el)) > 0
       && (length $ finalStateExt (nr,mr,er)) == 0 =  [(nl,appendVTexts m (VText [Chc d ml (VText [])]),el),(nr,appendVTexts m (VText [Chc d ml mr]),appendDimEnvs el er)]
                                                     ++ updateMatchChc d msL msR m--Identify such a case : vgrep1 ".*c" (toVtext "@3<c@,l@>").
-  | (length $ finalStateExt (nl,ml,el)) == 0 
+  | (length $ finalStateExt (nl,ml,el)) == 0
       && (length $ finalStateExt (nr,mr,er)) > 0  = [(nl,appendVTexts m (VText [Chc d ml mr]),appendDimEnvs el er),(nr,appendVTexts m (VText [Chc d (VText []) mr]),er)]
                                                     ++ updateMatchChc d msL msR m
-  | (length $ finalStateExt (nl,ml,el)) > 0 
-      && (length $ finalStateExt (nr,mr,er)) > 0  = (nl,appendVTexts m (VText [Chc d ml mr]),appendDimEnvs el er) 
+  | (length $ finalStateExt (nl,ml,el)) > 0
+      && (length $ finalStateExt (nr,mr,er)) > 0  = (nl,appendVTexts m (VText [Chc d ml mr]),appendDimEnvs el er)
                                                     : updateMatchChc d msL msR m--since both are successfull, doesnt matter which final node we pick
   | otherwise = [(nl,appendVTexts m (VText [Chc d ml mr]),appendDimEnvs el er)] ++ updateMatchChc d msL msR m -- here it doesnt matter which node you take since both are created out of same and if both havent been temrminated, they ought to be the same. Cannot use == here because * or + will have to be fully evaluated (nl == nr)
 
@@ -388,10 +388,10 @@ acceptor' nfa vtext = nfaRunSkipBegin BB (nfa nfaFinal) vtext --nfaRun' ( {- eps
 -}
 --The NFA interpreter
 
---skip the beginning characters until a match is found   
+--skip the beginning characters until a match is found
 nfaRunSkipBegin :: Branch -> NFANode -> VText -> [Result]
 nfaRunSkipBegin b n (VText [])                      = [] --no matches in this iteration
-nfaRunSkipBegin b n vt@(VText (v:vs)) 
+nfaRunSkipBegin b n vt@(VText (v:vs))
   | (length $ nfaStep' b "" [(n,VText[],[])] (VText [v])) == 0 = nfaRunSkipBegin b n (VText vs)
   | otherwise                                            = nfaRun' b n [(n,VText[],[])] vt
 
@@ -399,14 +399,14 @@ nfaRun' :: Branch -> NFANode -> [(NFANode,Match,DimEnv)] -> VText -> [Result]
 nfaRun' b orig [] vt                = nfaRerun b orig [] [] vt --failed match
 nfaRun' b orig ns (VText (v:vs))
   | (length $ concat (map finalState ns) ) == 0 = nfaRun' b orig (nfaStep' b "" ns (VText [v])) (VText vs)
-  | otherwise                     = nfaRerun b orig [] (getFinalMatches ns) (VText (v:vs))  --todo : need to propagate the matches 
+  | otherwise                     = nfaRerun b orig [] (getFinalMatches ns) (VText (v:vs))  --todo : need to propagate the matches
 nfaRun' _ _ ns (VText [])           = map (getResult) (concat (map finalStateExt ns))
 
---Check if the end transition has reached. 
+--Check if the end transition has reached.
 nfaRerun :: Branch -> NFANode -> [(NFANode,Match,DimEnv)] -> [Result] -> VText -> [Result]
 nfaRerun b orig [] ms (VText [])      = ms
 nfaRerun b orig [] ms v               = ms ++ nfaRunSkipBegin b orig v
-nfaRerun b orig ns ms v               = ms ++ nfaRun' b orig ns v 
+nfaRerun b orig ns ms v               = ms ++ nfaRun' b orig ns v
 
 getFinalMatches :: [(NFANode,Match,DimEnv)] -> [Result]
 getFinalMatches ns = map (getResult) (concat (map finalState ns) )
@@ -429,12 +429,12 @@ finalStateExt _                                             = []
 
 --NFAChc function
 --matchNFAChc :: DimExt -> (NFANode, NFANode) -> VText -> [Match]
---matchNFAChc d p v  = nfaRunSkipBegin BR (NFAChc d p) (nfaRunSkipBegin BL (NFAChc d p) 
+--matchNFAChc d p v  = nfaRunSkipBegin BR (NFAChc d p) (nfaRunSkipBegin BL (NFAChc d p)
 
 -- for testing
 nfa regex = (fst(head(nnRegexp regex))) nfaFinal-- [ ((fst(head(nnRegexp regex))) nfaFinal, "")]
 
-toVtext st = let (Right vtext) = ccParser st in vtext 
+toVtext st = let (Right vtext) = ccParser st in vtext
 
 testVregex :: NFANode -> VText -> [Result]
 testVregex nfa vtext = nfaRunSkipBegin BB (nfa) (vSplit vtext)
@@ -442,7 +442,7 @@ testVregex nfa vtext = nfaRunSkipBegin BB (nfa) (vSplit vtext)
 --show VText as is
 showV :: VText -> String
 showV (VText [])     = ""
-showV (VText (v:vs)) = "VText " ++ concatMap (showS) vs 
+showV (VText (v:vs)) = "VText " ++ concatMap (showS) vs
 
 showS :: Segment -> String
 showS (Plain x)      = "(Plain " ++ x ++ ")"
@@ -485,9 +485,9 @@ testSearch nfa file = do
 -- [(1<,xy>,[])]
 --
 -- >>> vgrep1 "ay" (toVtext "@1<ab@,xy@>")
--- [(1<a,y>,[])] 
+-- [(1<a,y>,[])]
 --
--- | Following doesnot match because 'a' and 'x' are characters in the same place 
+-- | Following doesnot match because 'a' and 'x' are characters in the same place
 --   and therefore cannot occur beside each other in 1<ab,xy>
 -- >>> vgrep1 "ax" (toVtext "@1<ab@,xy@>")
 -- []
@@ -546,9 +546,9 @@ testSearch nfa file = do
 --
 -- >>> testVregex (NFAChc (Dim 1) (nfa "b",nfa "y") ([VText []]) (NFAFinal)) (vSplit $ toVtext "@1<bx@,yz@>")
 -- [(1<b,y>,[])]
--- 
+--
 -- testVregex (NFAChc (VD "d1") (nfa "x",nfa ".*") ([VText []]) (NFAFinal)) (vSplit $ toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
--- 
+--
 --
 -- >>> testVregex (NFAChc (Dim 1) (nfa "b",nfa "y") ([VText []]) (NFAFinal)) (vSplit $ toVtext "@1<bx@,yz@>@2<b@,y@>")
 -- [(1<b,y>,[])]
@@ -578,7 +578,7 @@ testSearch nfa file = do
 -- >>> testVregex (NFAChc (VD "d1") (nfa "a",nfa "x") ([VText []]) (NFAFinal)) (vSplit $ toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
 -- [(1<a,2<x,>>,[("d1",[1])])]
 --
--- Should this return 1<a,2<,z>>??? 
+-- Should this return 1<a,2<,z>>???
 -- >>> testVregex (NFAChc (VD "d1") (nfa "a",nfa "z") ([VText []]) (NFAFinal)) (vSplit $ toVtext "@1<abcde@,@2<x@,z@>ylmn@>")
 -- [(1<a,2<x,z>>,[("d1",[1])])]
 --
@@ -593,7 +593,7 @@ testSearch nfa file = do
 --
 -- >>> testVregex (NFAChc (VD "d1") (nfa "ab",nfa ".*") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "@1<ab@,@>")
 -- [(1<a,>1<b,>,[("d1",[1])])]
--- 
+--
 -- >>> testVregex (NFAChc (VD "d1") (nfa "ab",nfa ".*") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "@1<abc@,@>")
 -- [(1<a,>1<b,>,[("d1",[1])])]
 -- >>> testVregex (NFAChc (VD "d1") (nfa "ab",nfa ".*") ([VText []]) (NFAFinal) ) (vSplit $ toVtext "@1<abc@,l@>")

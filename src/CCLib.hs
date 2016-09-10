@@ -12,7 +12,7 @@ module CCLib where
   import Pretty
   --import Data.Vector.Unboxed as Uvector  hiding ((++),concat,length,tail,map,take,drop,concatMap,maximum,reverse)
 
-  escape = "ⱺ" --"@"-- 
+  escape = "ⱺ" --"@"--
 
   data Sel = LSel !Int | RSel !Int
   type Selection = [Sel]
@@ -43,7 +43,7 @@ module CCLib where
   collectDiff ((D.Second x):ds) = Different [] x : collectDiff ds --insert
 
 --let v = f k x in v `seq` Tip k v
--- gives the diff output. custom diff so that the 'Both' data contructor can be changed to take only single argument 
+-- gives the diff output. custom diff so that the 'Both' data contructor can be changed to take only single argument
 --and identify different typed of changes ie., change, delete, insert
   (-?-) :: [Char] -> [Char] -> [Diff Char]
   old -?- new = collectDiff $ D.getGroupedDiff old new

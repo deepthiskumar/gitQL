@@ -24,6 +24,7 @@ showChcNoColor d es = escape ++ show d ++ bracketsNoColor (commasNoColor es)
 
 --
 -- Color & style definitions
+-- Doesn't work on Windows.
 --
 
 reset = "\27[0m"
@@ -40,7 +41,7 @@ purple = attrFG 5
 cyan   = attrFG 6
 white  = attrFG 7
 
-colors = map (++bold) [green,red,blue,yellow,purple,cyan]
+colors = map (++bold) [green, red, blue, yellow, purple, cyan]
 
 defaultColor = black ++ reset
 
