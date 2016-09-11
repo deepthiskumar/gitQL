@@ -5,48 +5,137 @@ module VPM where
 import Prelude hiding (seq)
 
 
-data Atomic = C Char | Wild
+data Atomic = C Char | Wild deriving(Show)
 
 data Pattern = Plain Atomic
              | Seq Atomic Pattern
              | Alt Pattern Pattern
+             deriving(Show)
 
-type Input = (Pos,String)
+
+type VString = [Segment]
+
+type Dim = Int
+
+data Segment = Str String | Chc Dim VString VString
+             deriving(Show)
+
+type VMatch = (Pos,[Match])
+
+data Match = MStr String | MChc Dim [VMatch] [VMatch]
+            deriving(Show)
+
+type Input = (Pos,VString)
+
 type Pos = Int
 
-type Split = Maybe (String,String)
+data SplitTy = StrSplit VMatch Input
+             | PatSplit VMatch Pattern
+             deriving(Show)
 
-type Match   = (Pos,String)
-type Matches = [Match]
+data Split = NoMatch
+           | SM SplitTy  --Single Match
+           | PM SplitTy SplitTy --Parallel Match
+           deriving(Show)
+
+type Matches = [VMatch]
 
 
+mStr c = (0, [MStr c])
 
-when :: a -> Bool -> Maybe a
-when x p = if p then Just x else Nothing
+vChr cs = Str cs
 
-andThen :: Split -> Split -> Split
-andThen (Just (m,r)) (Just (m',r')) = Just (m++m',r++r')
-andThen _ _ = Nothing
+vStr [] = []
+vStr s  = [Str s]
+
+mlistToV :: [VMatch] -> Input
+mlistToV []  = (0,[])
+mlistToV ms  = mToV (last ms)
+
+mToV :: VMatch -> Input
+mToV (i,[])                = (i,[])
+mToV (i,MStr s : ss)       = (i,Str s : (snd $ mToV (i,ss)))
+mToV (i,MChc d v1 v2 : ss) = (i,(Chc d (snd $ mlistToV v1 ) (snd $ mlistToV v2 ))
+                                : (snd $ mToV (i,ss)))
+
+proceed1 :: VString -> VString
+proceed1 (Str [] : ss)      = ss
+proceed1 (Str (c:s) : ss)   = (vStr s) ++ ss
+proceed1 (Chc d v1 v2 : ss) = Chc d (proceed1 v1) (proceed1 v2) : ss
+
+appendVM :: VMatch -> VMatch -> VMatch
+appendVM (p, ms) (p',ms') = (p, (appendM ms ms'))
+
+appendM :: [Match] -> [Match] -> [Match]
+appendM [] m                          = m
+appendM m []                          = m
+appendM (MStr s : ms) (MStr s' : ms') = (MStr (s++s')) : appendM ms ms'
+appendM (m:ms) (m':ms')               = m:m':appendM ms ms' --TODO choices
 
 orElse :: Split -> Split -> Split
-orElse s@(Just _) _ = s
-orElse _          s = s
+orElse NoMatch s   = s
+orElse s _         = s --TODO return both the matches like the unix grep?
 
-matches :: Pattern -> String -> Split
-matches (Plain (C d)) (c:s) = ([c],s) `when` (c==d)
-matches (Plain Wild)  (c:s) = Just ([c],s)
-matches (Seq a p)     (c:s) = matches (Plain a) [c] `andThen` matches p s
-matches (Alt p q)     s     = matches p s `orElse` matches q s
-matches _             _     = Nothing
+andThen :: Split -> Split-> Split
+andThen NoMatch _                                 = NoMatch
+andThen _       NoMatch                           = NoMatch
+andThen (SM (StrSplit m s)) (SM (PatSplit m' p))  = SM (PatSplit (appendVM m m') p)
+andThen (SM (StrSplit m s)) (SM (StrSplit m' s')) = SM (StrSplit (appendVM m m') s')
+andThen _                         _ = undefined
 
+
+matchStr :: Pattern -> Pos -> String -> Split
+matchStr (Plain (C d)) i (c:s)
+                     | c==d    = SM $ StrSplit (i,[MStr[c]]) (i+1,vStr s)
+matchStr (Plain Wild) i (c:s)  = SM $ StrSplit (i,[MStr[c]]) (i+1,vStr s)
+matchStr (Seq a p)    i (c:[]) = matchStr (Plain a) i [c] `andThen` (SM (PatSplit (0,[]) p))
+matchStr (Seq a p)    i (c:s)  = matchStr (Plain a) i [c] `andThen` matchStr p (i+1) s
+matchStr (Alt p q)    i s      = matchStr p i s `orElse` matchStr q i s
+matchStr _          _   _      = NoMatch
+
+--To Match the first character of the next segment and not scan
+rigidMatch :: VMatch -> Pattern -> (Pos,Segment) -> Split
+rigidMatch (j,m) p (i,s) = case matchSegment p (i,s) of
+                   NoMatch                  -> SM (StrSplit (0,[]) (j+1,
+                                                (proceed1 $ snd $ mToV (j,m)) ++ [s])) --new match
+                   SM (StrSplit m' (j',s')) -> SM (StrSplit (appendVM (j,m) m') (j',s'))
+                   SM (PatSplit m' p')      -> SM (PatSplit (appendVM (j,m) m') p')
+                   PM s1 s2                 -> undefined
+
+matchSegment :: Pattern -> (Pos,Segment) -> Split
+matchSegment p (i, Str s') = matchStr p i s'
+matchSegment p (i,vs@(Chc dim v1 v2)) = undefined
+
+
+continue :: Pattern -> Pos -> VString -> Split -> Matches
+continue p i v (SM (StrSplit m (j,[])))      = m: scan p (j,v) --next occurrence
+continue p i v (SM (StrSplit m (j,s')))      = m: scan p (j,s'++v) --next occurrence
+continue p i (s:ss) (SM (PatSplit (j,m) p')) = continue p (i+(lenIncr s)) ss
+                                                (rigidMatch (j,m) p' (i,s))
+continue p i v (PM s1 s2)                    = undefined
+continue _ _ [] _                            = []
+
+scanStr :: Pattern -> (Pos,String) -> Split
+scanStr p (i,matchStr p i-> SM s)     = SM s
+scanStr p (i,matchStr p i-> PM s1 s2) = undefined --TODO
+scanStr p (i,_:s)                     = scanStr p (i+1,s)
+scanStr _ (_,[])                      = NoMatch
+
+scanSegment :: Pattern -> (Pos,Segment) -> Split
+scanSegment p (i, Str s')            = scanStr p (i,s')
+scanSegment p (i,vs@(Chc dim v1 v2)) = undefined --TODO
+
+lenIncr :: Segment -> Int
+lenIncr (Str s)     = length s
+lenIncr (Chc _ _ _) = 1
 
 scan :: Pattern -> Input -> Matches
-scan p (i,matches p -> Just (m,r)) = (i,m):scan p (i+length m,r)
-scan p (i,_:s) = scan p (i+1,s)
-scan _ (_,[]) = []
+scan p (i,[])  = []
+scan p (i,s:ss) = case scanSegment p (i,s) of
+                   NoMatch  -> scan p (i+(lenIncr s),ss)
+                   split    -> continue p (i+(lenIncr s)) ss split
 
-
-match :: Pattern -> String -> Matches
+match :: Pattern -> VString -> Matches
 match p s = scan p (0,s)
 
 
