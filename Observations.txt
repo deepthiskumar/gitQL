@@ -1,0 +1,96 @@
+Observations & Laws
+--------------------
+
+--------------------------------------------------------------------------------------
+The rationale behind using the segment representation against the Char representation
+--------------------------------------------------------------------------------------
+type VString = [VChar]
+data VChar = Chr Char | Chc Dim VString VString
+            vs
+type VString = [Segment]
+data Segment = Str String | Chc Dim VString VString
+
+While it makes some functions easier to write, the Char representation is also 
+a source of inefficiency, because it creates an almost 100% overhead for plain 
+strings. Consider the string "abcd". The above representation of it looks as follows.
+
+[Chr 'a',Chr 'b',Chr 'c',Chr 'd']
+              vs        
+[Str "abcd"] = [Str ['a','b','c','d']]
+
+This means for each plain string of size n we save n-1 constructors with the 
+latter representation. For repositories whose size seems to be dominated by 
+the total number characters (and not choices), this means that we could cut the 
+size of the representation in half.
+
+----------------------------------------------------------------------
+Laws for matching non-variational patterns against variational strings
+----------------------------------------------------------------------
+
+1. P # l = m  &&   P # r = m'  ==>  P # A<l,r> = (0,A<m,m'>)
+where m or m' must be non-empty & m and m' must not overlap
+--TODO change in this rule. A<m,> or A<,m'>
+          
+2. We should get the same match (up to equivalence) regardless of the 
+representation.
+To use a simpler example, we want the following to be true.
+
+        a # A<a,a> == a # a
+
+This simply should follow because A<a,a> == a. 
+In general, we want the following property to hold.
+
+        s == s'  =>  P # s == P # s'
+
+This property says that matching is independent of the variational string 
+representation.
+
+-----------------------------------------------------------------------------
+Distinct cases for matching non-variational patterns against variational strings
+-----------------------------------------------------------------------------
+
+Case 1. A pattern is present in a plain string 
+    P # s
+Case 2. A pattern is present in either or both the alternatives of a choice
+    P # A<l,r>
+Case 3. A pattern spans plain strings and choices
+    Case 3L : P # sA<l,r>
+    Case 3R : P # A<l,r>t
+
+-----------------
+View of the match
+-----------------
+ I want to note that I think that the results should be normalized so that 
+ matches do not cross choice boundaries. E.g.
+
+        (0,A<a,>b) ~> (0,A<ab,>)
+        (0,A<(1,a),>b) ~>  (0,A<(1,ab),>)
+        ...
+
+The reason is that in our target application an alternative in a choice 
+represents a version, and we will probably expect a GitQuery tool to report 
+complete matches within versions, something like this:
+
+        version XYZ: ab
+        
+ 
+Also, suppose you are looking for all occurrences of a function foo, and suppose 
+further foo occurs in versions V and W multiple times. Reporting multiple 
+matches within alternatives corresponds to an output like this:
+
+        version V:
+                line 33: foo
+                line 47: foo
+                line 62: foo
+
+        version W:
+                line 15: foo
+                line 28: foo
+
+Therefore, multiple matches within alternatives are not shown as separate 
+matches altogether but a single match containing multiple matches within
+the alternatives.
+   (i)    ab # A<abxaby,lm> --> (0,A<[(0,ab),(3,ab)],>)
+   (ii)   a # A<aaa,ya>     --> (0,A<[(0,a),(1,a),(2,a),>)],[(1,a)]>)
+   (iii') ab # A<abcab,lm>b --> (0,A<[(0,ab),(3,a)],>b) 
+
