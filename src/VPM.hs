@@ -35,10 +35,12 @@ data SplitTy = StrSplit VMatch Input
 
 data Split = NoMatch
            | SM SplitTy  --Single Match
-           | PM SplitTy SplitTy --Parallel Match
+           | PM SplitTy SplitTy --Parallel Match (SplitStop, SplitContinue)
            deriving(Show)
 
 type Matches = [VMatch]
+
+data Alt = L|R
 
 
 mStr c = (0, [MStr c])
@@ -94,31 +96,54 @@ matchStr (Alt p q)    i s      = matchStr p i s `orElse` matchStr q i s
 matchStr _          _   _      = NoMatch
 
 --To Match the first character of the next segment and not scan
-rigidMatch :: VMatch -> Pattern -> (Pos,Segment) -> Split
-rigidMatch (j,m) p (i,s) = case matchSegment p (i,s) of
+rigidMatch :: Pattern -> VMatch -> Pattern -> (Pos,Segment) -> Split
+rigidMatch origP (j,m) p (i,s) = case matchSegment origP p (i,s) of
   NoMatch                  -> SM (StrSplit (0,[]) (j+1,
                                (proceed1 $ snd $ mToV (j,m)) ++ [s])) --new match
   SM (StrSplit m' (j',s')) -> SM (StrSplit (appendVM (j,m) m') (j',s'))
   SM (PatSplit m' p')      -> SM (PatSplit (appendVM (j,m) m') p')
   PM s1 s2                 -> undefined
 
-matchSegment :: Pattern -> (Pos,Segment) -> Split
-matchSegment p (i, Str s') = matchStr p i s'
-matchSegment p (i,vs@(Chc dim v1 v2)) = matchChoice dim i (matchAlt p (0,v1)) 
-                                         (matchAlt p (0,v2))
+matchSegment :: Pattern -> Pattern -> (Pos,Segment) -> Split
+matchSegment origP p (i, Str s') = matchStr p i s'
+matchSegment origP p (i,vs@(Chc d v1 v2)) = matchChoice d i (matchAlt origP d i L p (0,v1))
+                                         (matchAlt origP d i R p (0,v2))
 
 matchChoice :: Dim -> Pos -> Split -> Split -> Split
-matchChoice d i s NoMatch = leftMatch d i s
-matchChoice d i NoMatch s = rightMatch d i s
+matchChoice d i s NoMatch = s --leftMatch d i (inLeft d i s)
+matchChoice d i NoMatch s = s --rightMatch d i (inRight d i s)
 matchChoice d i s1 s2     = undefined --(PM (leftMatch d i s1) (rightMatch d i s2))
 
-matchAlt :: Pattern -> Input -> Split
-matchAlt p (i,[]) = SM (PatSplit (0,[]) p)
-matchAlt p (i,s:ss) = case matchSegment p (i,s) of
+--TODO[1] the position of the remaining segments (j) in the alternative is lost.
+-- to track this, we either have to introduce Pos in VString or match the
+-- remaining alternatives with the original patten again (not the Split pattern)
+inLeft :: Dim -> Pos -> Split ->  Split
+inLeft d i (SM (StrSplit m (j,s))) = SM (StrSplit m (i,[Chc d s []]))
+inLeft d i s                   = s
+
+inRight :: Dim -> Pos -> Split ->  Split
+inRight d i (SM (StrSplit m (j,s))) = SM (StrSplit m (i,[Chc d [] s]))
+inRight d i s                   = s
+
+matchAlt :: Pattern -> Dim -> Pos -> Alt -> Pattern -> Input -> Split
+matchAlt origP d i a p (j,[]) = SM (PatSplit (0,[]) p)
+matchAlt origP d i a p (j,s:ss) = case matchSegment origP p (j,s) of
   NoMatch                  -> NoMatch
-  SM (StrSplit m' (j',s')) -> SM (StrSplit m' (j', s'++ss))
+  SM (StrSplit m' (j',s')) -> let (ms,sp) = scan origP (j',s'++ss)--SM (StrSplit m' (j', s'++ss)) --TODO[1]
+                              in altSplit a i d (m':ms) sp--SM (StrSplit (i,createMChc a d (m':ms)) sp)
   SM (PatSplit m' p')      -> SM (PatSplit m' p')
   PM s1 s2                 -> undefined 
+
+altSplit :: Alt -> Pos -> Dim -> Matches -> Split -> Split
+altSplit a i d ms NoMatch                  = SM $ StrSplit (i,createMChc a d ms) (i+1,[])
+altSplit a i d ms (SM (StrSplit m (j,[]))) = SM $ StrSplit (i,createMChc a d (ms++[m])) (i+1,[])
+altSplit a i d ms (SM (PatSplit m p))      = PM (StrSplit (i,createMChc a d ms) (i+1,[])) (PatSplit (i,createMChc a d [m]) p)
+altSplit _ _ _ _ (PM s1 s2)                = undefined
+
+createMChc :: Alt -> Dim -> [VMatch] -> [Match]
+createMChc a d [] = []
+createMChc L d vs = [MChc d vs []]
+createMChc R d vs = [MChc d [] vs]
 
 appendMatches :: Matches -> (Matches,Split) -> (Matches,Split)
 appendMatches ms (ms',s) = (ms++ms',s)
@@ -130,28 +155,28 @@ addMatch m (ms,s) = (m:ms,s)
 continue :: Pattern -> Pos -> VString -> Split -> (Matches,Split)
 continue p i v (SM (StrSplit m (j,s')))      = addMatch m (scan p (j,s'++v)) --next occurrence
 continue p i (s:ss) (SM (PatSplit (j,m) p')) = continue p (i+(lenIncr s)) ss
-                                                (rigidMatch (j,m) p' (i,s))
+                                                (rigidMatch p (j,m) p' (i,s))
 continue p i v (PM s1 s2)                    = undefined
 continue _ _ [] s@(SM (PatSplit (j,m) p'))   = ([],s)
 
-leftMatch :: Dim -> Pos -> Split -> Split
+leftMatch :: Dim -> Pos -> Split -> Split --altSplit
 leftMatch _ _ NoMatch             = NoMatch
 leftMatch d i (SM (StrSplit m s)) = SM $ StrSplit (i,[MChc d [m] []]) s
 leftMatch d i (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d [m] []]) p
-leftMatch d i (PM s1 s2)          = undefined 
+leftMatch d i (PM s1 s2)          = undefined
 
 rightMatch :: Dim -> Pos -> Split -> Split
 rightMatch _ _ NoMatch             = NoMatch
 rightMatch d i (SM (StrSplit m (j,s))) = SM $ StrSplit (i,[MChc d [] [m]]) (j,s)
 rightMatch d i (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d [] [m]]) p
-rightMatch d i (PM s1 s2)          = undefined 
+rightMatch d i (PM s1 s2)          = undefined
 
 scanChoice :: Dim -> Pos -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
 scanChoice d i ([],NoMatch) ([],NoMatch) = ([],NoMatch) --TODO non empty matches and NoMatch
-scanChoice d i (ml,sl) ([],NoMatch)      
+scanChoice d i (ml,sl) ([],NoMatch)
   | null ml    = ([], leftMatch d i sl)
   | otherwise  = ([(i,[MChc d ml []])], leftMatch d i sl)
-scanChoice d i ([],NoMatch) (mr,sr)      
+scanChoice d i ([],NoMatch) (mr,sr)
   | null mr    = ([], rightMatch d i sr)
   | otherwise  = ([(i,[MChc d [] mr])], rightMatch d i sr)
 scanChoice s i (ml,sl) (mr,sr)           = undefined

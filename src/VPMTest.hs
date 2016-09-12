@@ -31,7 +31,7 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MStr "abc"]),(3,[MStr "abc"])]
 -- >>> match ab [Str "abca", Str "bxab"]
 -- [(0,[MStr "ab"]),(3,[MStr "ab"]),(6,[MStr "ab"])]
--- 
+--
 -- | Case 2 - only choices
 -- >>> match a vc
 -- [(0,[MChc 1 [(0,[MStr "a"])] []])]
@@ -70,6 +70,7 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- >>> match abc [Str "a", Chc 1 [Str "bcd"] [Str "ef"]]
 -- [(0,[MStr "a",MChc 1 [(0,[MStr "bc"])] []])]
 -- >>> match ab [Str "a", Chc 1 [Str "bcab"] [Str "c"]]
+-- [(0,[MStr "a",MChc 1 [(0,[MStr "b"]),(2,[MStr "ab"])] []])]
 
 -- |Case 3R
 -- >>> match ab [Chc 1 [Str "a"] [Str "c"],Str "b"]
@@ -80,14 +81,19 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MChc 1 [(1,[MStr "a"])] [],MStr "b"])]
 -- >>> match ab [Chc 1 [Str "x"] [Str "ya"],Str "b"]
 -- [(0,[MChc 1 [] [(1,[MStr "a"])],MStr "b"])]
--- 
+--
 -- | this is not a parallel match
 -- >>> match ab [Chc 1 [Str "ax"] [Str "ya"],Str "b"]
 -- [(0,[MChc 1 [] [(1,[MStr "a"])],MStr "b"])]
 -- >>> match ab [Chc 1 [Str "xa"] [Str "ay"],Str "b"]
 -- [(0,[MChc 1 [(1,[MStr "a"])] [],MStr "b"])]
 --
--- | Parallel match 
+-- | Parallel match
+-- | The following two examples needs to return 2 splits, one for all the successfull
+--   matches in the alternative and the other for residual pattern
+-- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "bcx"]
+--
+-- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "x"]
 
 -- |parallel matches
 -- |>>> match (VPM.seq [c,a]) share
@@ -95,5 +101,5 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- |>>> match (VPM.seq [c,a]) [ Chr 'x',  Chc 1 ( [Chr 'x',Chr  'b', Chr 'a'] ) ([Chr  'c'] ), Chr 'a']
 -- [(1,[MChc 1 [] [(0,[MChr 'c'])],MChr 'a'])]
 -- |>>> match (VPM.seq [c,a]) [ Chr 'c',  Chc 1 ( [Chr 'a',Chr  'b', Chr 'a'] ) ([Chr  'c'] ), Chr 'a']
--- 
+--
 
