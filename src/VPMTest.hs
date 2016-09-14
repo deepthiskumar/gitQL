@@ -57,6 +57,16 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MChc 1 [(0,[MStr "ab"]),(2,[MStr "ab"])] []])]
 -- >>> match ab [Chc 1 [Str "abcab"] [Str "cd"]]
 -- [(0,[MChc 1 [(0,[MStr "ab"]),(3,[MStr "ab"])] []])]
+--
+-- | Parallel matches
+-- >>> match a [Chc 1 [Str "ab"] [Str "ca"]]
+-- [(0,[MChc 1 [(0,[MStr "a"])] [(1,[MStr "a"])]])]
+-- >>> match a [Chc 1 [Str "aba"] [Str "ca"]]
+-- [(0,[MChc 1 [(0,[MStr "a"]),(2,[MStr "a"])] [(1,[MStr "a"])]])]
+-- >>> match a [Chc 1 [Str "aaa"] [Str "ca"]]
+-- [(0,[MChc 1 [(0,[MStr "a"]),(1,[MStr "a"]),(2,[MStr "a"])] [(1,[MStr "a"])]])]
+-- >>> match ab [Chc 1 [Str "abcdyab"] [Str "xabab"]]
+-- [(0,[MChc 1 [(0,[MStr "ab"]),(5,[MStr "ab"])] [(3,[MStr "ab"])]])]
 
 -- |Case 3L
 -- >>> match ab [Str "a", Chc 1 [Str "b"] [Str "c"]]
@@ -71,6 +81,12 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MStr "a",MChc 1 [(0,[MStr "bc"])] []])]
 -- >>> match ab [Str "a", Chc 1 [Str "bcab"] [Str "c"]]
 -- [(0,[MStr "a",MChc 1 [(0,[MStr "b"]),(2,[MStr "ab"])] []])]
+--
+-- |parallel matches
+-- >>> match (VPM.seq [c,a]) share
+-- [(0,[MStr "c",MChc 1 [(0,[MStr "a"])] []])]
+-- >>> match ab [Str "a", Chc 1 [Str "bd"] [Str "be"]]
+-- [(0,[MStr "a",MChc 1 [(0,[MStr "b"])] [(0,[MStr "b"])]])]
 
 -- |Case 3R
 -- >>> match ab [Chc 1 [Str "a"] [Str "c"],Str "b"]
@@ -81,25 +97,49 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MChc 1 [(1,[MStr "a"])] [],MStr "b"])]
 -- >>> match ab [Chc 1 [Str "x"] [Str "ya"],Str "b"]
 -- [(0,[MChc 1 [] [(1,[MStr "a"])],MStr "b"])]
+-- >>> match abc [Chc 1 [Str "ab"] [Str "x"],Str "abc"]
+-- [(1,[MStr "abc"])]
+-- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "bcx"]
+-- [(0,[MStr "a",MChc 1 [(0,[MStr "b"])] []]),(1,[MChc 1 [(2,[MStr "a"])] [],MStr "b"])]
+-- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "x"]
+-- [(0,[MStr "a",MChc 1 [(0,[MStr "b"])] []])]
 --
--- | this is not a parallel match
+-- | these are not parallel matches
 -- >>> match ab [Chc 1 [Str "ax"] [Str "ya"],Str "b"]
 -- [(0,[MChc 1 [] [(1,[MStr "a"])],MStr "b"])]
 -- >>> match ab [Chc 1 [Str "xa"] [Str "ay"],Str "b"]
 -- [(0,[MChc 1 [(1,[MStr "a"])] [],MStr "b"])]
 --
--- | Parallel match
--- | The following two examples needs to return 2 splits, one for all the successfull
---   matches in the alternative and the other for residual pattern
--- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "bcx"]
---
--- >>> match ab [Str "a", Chc 1 [Str "bca"] [Str "c"], Str "x"]
-
 -- |parallel matches
--- |>>> match (VPM.seq [c,a]) share
--- [(0,[MChr 'c',MChc 1 [(0,[MChr 'a'])] []])]
--- |>>> match (VPM.seq [c,a]) [ Chr 'x',  Chc 1 ( [Chr 'x',Chr  'b', Chr 'a'] ) ([Chr  'c'] ), Chr 'a']
--- [(1,[MChc 1 [] [(0,[MChr 'c'])],MChr 'a'])]
--- |>>> match (VPM.seq [c,a]) [ Chr 'c',  Chc 1 ( [Chr 'a',Chr  'b', Chr 'a'] ) ([Chr  'c'] ), Chr 'a']
+-- >>> match (VPM.seq [c,a]) [ Str "x",  Chc 1 ( [Str "xba"] ) ([Str  "c"] ), Str "a"]
+-- [(1,[MChc 1 [] [(0,[MStr "c"])],MStr "a"])]
+-- >>> match ab [Chc 1 [Str "xa"] [Str "ya"], Str "b"]
+-- [(0,[MChc 1 [(1,[MStr "a"])] [(1,[MStr "a"])],MStr "b"])]
+-- >>> match ab [Chc 1 [Str "xa"] [Str "yab"], Str "b"]
+-- [(0,[MChc 1 [] [(1,[MStr "ab"])]]),(0,[MChc 1 [(1,[MStr "a"])] [],MStr "b"])]
+-- >>> match ab [Chc 1 [Str "a"] [Str "ab"], Str "b"]
+-- [(0,[MChc 1 [] [(0,[MStr "ab"])]]),(0,[MChc 1 [(0,[MStr "a"])] [],MStr "b"])]
+-- >>> match abc [Chc 1 [Str "abcyab"] [Str "lmnab"], Str "c"]
 --
+-- |Following needs to be resolved
+-- |Error: Position withing the choice is lost and therefore
+-- >>> match (seq [a,a,b]) [Str "a", Chc 1 [Str "bcaa"] [Str "c"], Str "abx"]
+-- [(0,[MChc 1 [(0,[MStr "a"])] [],MStr "ab"])]
+--
+-- |Error:  "ca" from the right alternative needs to be matches
+-- >>> match (VPM.seq [c,a]) [ Str "c", Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
+-- [(0,[MStr "c",MChc 1 [(0,[MStr "a"])] []])]
+--
+-- |Error : resolve overlap between the matched value of StrSplit and PatSplit
+-- >>> match ab [Chc 1 [Str "xab"] [Str "a"], Str "b"]
+-- [(0,[MChc 1 [(1,[MStr "ab"])] []]),(0,[MChc 1 [] [(0,[MStr "a"])],MStr "b"])]
+--
+-- |Error: start 2 threads for matching when PM occurs
+-- >>> match abc [Chc 1 [Str "abcya"] [Str "lmnab"], Str "c"]
+
+
+
+
+
+
 
