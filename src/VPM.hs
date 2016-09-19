@@ -4,7 +4,7 @@ module VPM where
 
 import Prelude hiding (seq)
 import Data.Maybe
-
+import Data.List
 
 data Atomic = C Char | Wild deriving(Show,Eq)
 
@@ -85,7 +85,7 @@ andThen NoMatch _                                 = NoMatch
 andThen _       NoMatch                           = NoMatch
 andThen (SM (StrSplit m s)) (SM (PatSplit m' p))  = SM (PatSplit (appendVM m m') p)
 andThen (SM (StrSplit m s)) (SM (StrSplit m' s')) = SM (StrSplit (appendVM m m') s')
-andThen _                         _ = undefined
+andThen _                   _                     = undefined
 
 
 matchStr :: Pattern -> Pos -> String -> Split
@@ -100,41 +100,43 @@ matchStr _          _   _      = NoMatch
 --To Match the first character of the next segment and not scan
 rigidMatch :: Pattern -> VMatch -> Pattern -> (Pos,Segment) -> (Maybe VMatch,Split)
 rigidMatch origP (j,m) p (i,s) = case matchSegment origP p (i,s) of
-  (Nothing,NoMatch)                  -> (Nothing,SM (StrSplit (0,[]) (j,
+  (Nothing,NoMatch)             -> (Nothing,SM (StrSplit (0,[]) (j,
                                (proceed1 $ snd $ mToV (j,m)) ++ [s]))) --new match
   (ma,SM (StrSplit m' (j',s'))) -> (Just $ appendVM (appendVM (j,m) (fromMaybe (0,[]) ma)) m',SM (StrSplit (0,[]) (j',s')))
   (ma,SM (PatSplit m' p'))      -> (Just $ appendVM (j,m) (fromMaybe (0,[]) ma),SM (PatSplit m' p'))
   (ma,PM s1 s2)                 -> undefined
 
 matchSegment :: Pattern -> Pattern -> (Pos,Segment) -> (Maybe VMatch,Split)
-matchSegment origP p (i, Str s') = (Nothing,matchStr p i s')
+matchSegment origP p (i, Str s')          = (Nothing,matchStr p i s')
 matchSegment origP p (i,vs@(Chc d v1 v2)) = matchChoice d i (matchAlt origP d i L p (0,v1))
                                          (matchAlt origP d i R p (0,v2))
 
 matchChoice :: Dim -> Pos -> (Maybe VMatch,Split) -> (Maybe VMatch,Split) -> (Maybe VMatch,Split)
 matchChoice d i s (Nothing,NoMatch) = s
 matchChoice d i (Nothing,NoMatch) s = s
-matchChoice d i s1 s2     = checkOverlap d i s1 s2
+matchChoice d i s1 s2               = checkOverlap d i s1 s2
 
 checkOverlap :: Dim -> Pos -> (Maybe VMatch,Split) -> (Maybe VMatch,Split) -> (Maybe VMatch,Split)
 checkOverlap d i (Nothing,SM (StrSplit (k,[MChc dim v1 []]) (j,[]))) (Nothing,SM (StrSplit (k',[MChc dim' [] v2]) (j',[])))
    | j == j'   = (Nothing,SM (StrSplit (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 v1 v2))) (j+1,[])))
    | otherwise = undefined
-checkOverlap d i (Nothing,SM (StrSplit (k,[MChc dim v1 []]) (j,[]))) (ma',SM (PatSplit (k',m) p)) =
-   (Nothing, PM (StrSplit (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 v1 (getAltMatches (fromMaybe (0,[]) ma'))))) (j,[])) (PatSplit (k',m) p))
-checkOverlap d i (ma,SM (PatSplit (k,m) p)) (Nothing,SM (StrSplit (k',[MChc dim' [] v2]) (j',[]))) =
-   (Nothing, PM (StrSplit (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 (getAltMatches (fromMaybe (0,[]) ma)) v2))) (j',[])) (PatSplit (k,m) p))
-checkOverlap d i (ma,SM (PatSplit m@(k,[MChc dim v1 []]) p)) (ma',SM (PatSplit m'@(k',[MChc dim' [] v2]) p'))
-  | p == p'          = (genVMatch d i (resolveOverlap 0 (getAltMatches (fromMaybe (0,[]) ma)) (getAltMatches (fromMaybe (0,[]) ma'))), SM (PatSplit (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 v1 v2))) p))
-  | otherwise = undefined --TODO
+checkOverlap d i (Nothing,s1@(SM (StrSplit (k,[MChc dim v1 []]) (j,[])))) (ma',s2@(SM (PatSplit (k',m) p))) =
+   let (ms,v) = separateLastMatch s1 s2 v1
+   in (genVMatch d i (resolveOverlap 0 ms (getAltMatches (fromMaybe (0,[]) ma'))), PM (StrSplit v (j,[])) (PatSplit (k',m) p))
+checkOverlap d i (ma,s1@(SM (PatSplit (k,m) p))) (Nothing,s2@(SM (StrSplit (k',[MChc dim' [] v2]) (j',[])))) =
+   let (ms,v) = separateLastMatch s2 s1 v2
+   in (genVMatch d i (resolveOverlap 0 (getAltMatches (fromMaybe (0,[]) ma)) ms), PM (StrSplit v (j',[])) (PatSplit (k,m) p))
+checkOverlap d i (ma,SM (PatSplit m@(k,[MChc dim v1 []]) p)) (ma',SM (PatSplit m'@(k',[MChc dim' [] v2]) p')) 
+   | p == p'          = (genVMatch d i (resolveOverlap 0 (getAltMatches (fromMaybe (0,[]) ma)) (getAltMatches (fromMaybe (0,[]) ma'))), SM (PatSplit (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 v1 v2))) p))
+   | otherwise = (genVMatch d i (resolveOverlap 0 (getAltMatches (fromMaybe (0,[]) ma)) (getAltMatches (fromMaybe (0,[]) ma'))),PM (PatSplit m p) (PatSplit m' p'))
 checkOverlap d i _ _ = undefined --if PM
 
 
 getAltMatches :: VMatch -> Matches
-getAltMatches (_,[]) = []
+getAltMatches (_,[])            = []
 getAltMatches (_,[MChc d m []]) = m
 getAltMatches (_,[MChc d [] m]) = m
-getAltMatches (_,_) = undefined
+getAltMatches (_,_)             = undefined
 
 
 
@@ -144,13 +146,17 @@ genVMatch d i (ms,ms') = Just (i,[MChc d ms ms'])
 
 resolveOverlap :: Pos -> Matches -> Matches -> (Matches,Matches)
 resolveOverlap _ [] [] = ([],[])
-resolveOverlap _ ms [] = (ms,[])
-resolveOverlap _ [] ms' = ([],ms')
+resolveOverlap k ((j,m):ms) []   
+   | j >= k    = ((j,m):ms,[])
+   | otherwise = resolveOverlap k ms []
+resolveOverlap k [] ((j',m'):ms') 
+   | j' >= k   = ([],(j',m'):ms')
+   | otherwise = resolveOverlap k [] ms'
 resolveOverlap k ((j,m):ms) ((j',m'):ms')
-   | j < j' && j>= k = ([(j,m)],[]) `and` resolveOverlap (j+longest m []) ms ((j',m'):ms')
-   | j < j' && j< k  = ([],[]) `and` resolveOverlap k ms ((j',m'):ms')
-   | j'< j && j'>= k = ([], [(j',m')]) `and` resolveOverlap (j'+longest m' []) ((j,m):ms) ms'
-   | j'< j && j'< k  = ([], []) `and` resolveOverlap k ((j,m):ms) ms'
+   | j < j' && j>= k   = ([(j,m)],[]) `and` resolveOverlap (j+longest m []) ms ((j',m'):ms')
+   | j < j' && j< k    = ([],[]) `and` resolveOverlap k ms ((j',m'):ms')
+   | j'< j && j'>= k   = ([], [(j',m')]) `and` resolveOverlap (j'+longest m' []) ((j,m):ms) ms'
+   | j'< j && j'< k    = ([], []) `and` resolveOverlap k ((j,m):ms) ms'
    | j == j' && j >= k = ([(j,m)],[(j',m')]) `and` resolveOverlap (longest m m') ms ms'
    where and (m,m') (ms,ms') = (m++ms, m'++ms')
 
@@ -187,9 +193,9 @@ matchAlt origP d i a p (j,s:ss) = case matchSegment origP p (j,s) of
   (m,PM s1 s2)                 -> undefined
 
 join :: Maybe VMatch -> Maybe VMatch -> Maybe VMatch
-join Nothing Nothing = Nothing
-join _ Nothing       = Nothing
-join Nothing m       = m
+join Nothing      Nothing       = Nothing
+join _            Nothing       = Nothing
+join Nothing      m             = m
 join (Just (i,m)) (Just (j,m')) = Just (i,m++m')
 
 altSplit :: Alt -> Pos -> Dim -> Matches -> Split -> (Maybe VMatch, Split)
@@ -204,7 +210,12 @@ createMChc L d vs = [MChc d vs []]
 createMChc R d vs = [MChc d [] vs]
 
 appendMatches :: Matches -> (Matches,Split) -> (Matches,Split)
-appendMatches ms (ms',s) = (ms++ms',s)
+appendMatches ms (ms',s) = (removeNoMatch ms ++ removeNoMatch ms',s)
+
+removeNoMatch :: Matches -> Matches
+removeNoMatch []          = []
+removeNoMatch ((_,[]):ms) = removeNoMatch ms
+removeNoMatch (m:ms)      = m : removeNoMatch ms
 
 addMatch :: VMatch -> (Matches,Split) -> (Matches,Split)
 addMatch (_,[]) m = m
@@ -214,38 +225,107 @@ continue :: Pattern -> Pos -> VString -> Split -> (Matches,Split)
 continue p i v (SM (StrSplit m (j,s')))      = addMatch m (scan p (j,s'++v)) --next occurrence
 continue p i (s:ss) (SM (PatSplit (j,m) p')) = let (ma,sp) = rigidMatch p (j,m) p' (i,s)
  in addMatch (fromMaybe (j,[]) ma) (continue p (i+(lenIncr s)) ss sp)
-continue p i v (PM s1 s2)                    = undefined
+continue p i v (PM s1 s2)                    = matchPM p i v (SM s1) (SM s2)
 continue _ _ [] s@(SM (PatSplit (j,m) p'))   = ([],s)
 
+matchPM :: Pattern -> Pos -> VString -> Split -> Split -> (Matches, Split)
+matchPM origP i ss (SM (StrSplit m (j,s))) (SM (StrSplit m' (j',s')))   = longestMatch origP ss (m,(j,s)) (m',(j',s'))
+matchPM origP i ss s1@(SM (StrSplit m (j,[]))) s2@(SM (PatSplit m' p))  = let (ma,sp) = continueInNext origP i ss s2
+  in appendMatches ma (getCompleteMatch origP i ss s1 sp)--addMatch m (continue origP i ss (SM $ PatSplit m' p)) --TODO Here check for overlapping or the first match between m and complete m'
+matchPM origP i ss s1@(SM (PatSplit m' p )) s2@(SM (StrSplit m (j,[]))) = let (ma,sp) = continueInNext origP i ss s1
+  in appendMatches ma (getCompleteMatch origP i ss sp s2)--addMatch m (continue origP i ss (SM $ PatSplit m' p)) --TODO same as above
+matchPM origP i (s:ss) (SM(PatSplit (j,m) p )) (SM(PatSplit (j',m') p'))= 
+  let (ma,sp)   = rigidMatch origP (j,m) p (i,s)
+      (ma',sp') = rigidMatch origP (j',m') p' (i,s)
+  in appendMatches [fromMaybe (j,[]) ma,fromMaybe (j',[]) ma'] (getCompleteMatch origP (i+(lenIncr s)) ss sp sp')
 
-leftMatch :: Dim -> Pos -> Split -> Split --TODO use Alt
-leftMatch _ _ NoMatch             = NoMatch
-leftMatch d i (SM (StrSplit m s)) = SM $ StrSplit (i,[MChc d [m] []]) s
-leftMatch d i (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d [m] []]) p
-leftMatch d i (PM s1 s2)          = undefined
+longestMatch :: Pattern -> VString -> (VMatch,Input) -> (VMatch,Input) -> (Matches, Split)
+longestMatch p ss l@((i,m),(j,s)) r@((i',m'),(j',s')) 
+  | i > i'  = addMatch (i',m') (scan p (j',s'++ss))
+  | i < i'  = addMatch (i,m) (scan p (j,s++ss))
+  | i == i' = firstMatch p ss l r 
+  
+firstMatch :: Pattern -> VString -> (VMatch,Input) -> (VMatch,Input) -> (Matches, Split)
+firstMatch p ss ((_,[]),y) ((_,[]),y') = let (l,vs) = shortestSegment y y'
+                                         in  scan p (l,vs++ss)
+firstMatch p ss ((_,[]),y) (m,(l,vs))  = addMatch m (scan p (l,vs++ss))
+firstMatch p ss (m,(l,vs)) ((_,[]),y)  = addMatch m (scan p (l,vs++ss))
+firstMatch p ss l@(x@(i,MChc _ [(k,m)] [] :ms),y@(j,s)) r@(x'@(i',MChc _ [] [(k',m')] :ms'),y'@(j',s'))
+  | k > k'  = addMatch x' (scan p (j',s'++ss))
+  | k < k'  = addMatch x (scan p (j,s++ss))
+  | k == k' = let (l,vs) = shortestSegment y y'
+              in appendMatches [x,x'] (scan p (l,vs++ss))
+firstMatch _ _ _ _ = undefined
 
-rightMatch :: Dim -> Pos -> Split -> Split
-rightMatch _ _ NoMatch             = NoMatch
-rightMatch d i (SM (StrSplit m s)) = SM $ StrSplit (i,[MChc d [] [m]]) s
-rightMatch d i (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d [] [m]]) p
-rightMatch d i (PM s1 s2)          = undefined
+shortestSegment :: Input -> Input -> Input
+shortestSegment (j,s) (j',s') 
+  | j < j'     = (j',s')
+  | otherwise  = (j,s) --both the cases same result
+  
+getCompleteMatch :: Pattern -> Pos -> VString -> Split -> Split -> (Matches,Split)
+getCompleteMatch p i v (PM s1 s2) (PM s1' s2') = undefined
+getCompleteMatch p i v NoMatch NoMatch         = ([],SM $ StrSplit (i,[]) (i,[])) --TODO continue, rewind the match from previous segment
+getCompleteMatch p i v NoMatch s               = continueInNext p i v s
+getCompleteMatch p i v s NoMatch               = continueInNext p i v s
+getCompleteMatch p i v s1 s2                   = let (ma,sp) = next s1
+                                                     (ma',sp') = next s2
+                                                 in appendMatches (ma++ma') (matchPM p i v sp sp')
+                                                 where next s = continueInNext p i v s
+
+--Need this because `continue` starts scanning again after the match
+continueInNext :: Pattern -> Pos -> VString -> Split -> (Matches,Split)
+continueInNext p i v (NoMatch)                     = ([],NoMatch)
+continueInNext p i v (SM (StrSplit m (j,s')))      = ([],SM $ StrSplit m (j,s'))
+continueInNext p i (s:ss) (SM (PatSplit (j,m) p')) = let (ma,sp) = rigidMatch p (j,m) p' (i,s)
+ in addMatch (fromMaybe (j,[]) ma) (continueInNext p (i+(lenIncr s)) ss sp)
+continueInNext p i v (PM s1 s2)                    = matchPM p i v (SM s1) (SM s2)
+continueInNext _ _ [] s                            = ([],s)
+
+
+leftMatch :: Dim -> Pos -> Matches -> Split -> Split --TODO use Alt
+leftMatch _ _ [] NoMatch             = NoMatch
+leftMatch d i ms NoMatch             = SM $ StrSplit (i,[MChc d (ms) []]) (i+1,[])
+leftMatch d i ms (SM (StrSplit m s)) = SM $ StrSplit (i,[MChc d (ms++[m]) []]) s
+leftMatch d i ms (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d (ms++[m]) []]) p
+leftMatch d i ms (PM s1 s2)          = undefined
+
+rightMatch :: Dim -> Pos -> Matches -> Split -> Split
+rightMatch _ _ [] NoMatch             = NoMatch
+rightMatch d i ms NoMatch             = SM $ StrSplit (i,[MChc d [] (ms)]) (i+1,[])
+rightMatch d i ms (SM (StrSplit m s)) = SM $ StrSplit (i,[MChc d [] (ms++[m])]) s
+rightMatch d i ms (SM (PatSplit m p)) = SM $ PatSplit (i,[MChc d [] (ms++[m])]) p
+rightMatch d i ms (PM s1 s2)          = undefined
 
 scanChoice :: Dim -> Pos -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
 scanChoice d i ([],NoMatch) ([],NoMatch) = ([],NoMatch) --TODO non empty matches and NoMatch
 scanChoice d i (ml,sl) ([],NoMatch)
-  | null ml    = ([], leftMatch d i sl)
-  | otherwise  = ([(i,[MChc d ml []])], leftMatch d i sl)
+  | null ml    = ([], leftMatch d i [] sl)
+  | otherwise  = let (ms,m) = separateLastMatch sl NoMatch ml
+  in ([(i,[MChc d ms []])], leftMatch d i (checkNoMatch m) sl)
 scanChoice d i ([],NoMatch) (mr,sr)
-  | null mr    = ([], rightMatch d i sr)
-  | otherwise  = ([(i,[MChc d [] mr])], rightMatch d i sr)
+  | null mr    = ([], rightMatch d i [] sr)
+  | otherwise  = let (ms,m) = separateLastMatch sr NoMatch mr
+  in ([(i,[MChc d [] ms])], rightMatch d i (checkNoMatch m) sr)
 scanChoice d i (ml,sl) (mr,sr)  =
-  let (ma,sp) = matchChoice d i (Nothing,leftMatch d i sl) (Nothing,rightMatch d i sr)
-  in (checkNoMatch (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 ml mr)))
+  let (ms,m)   = separateLastMatch sl sr ml
+      (ms',m') = separateLastMatch sl sr mr
+      (ma,sp)  = matchChoice d i (Nothing,leftMatch d i (checkNoMatch m) sl) (Nothing,rightMatch d i (checkNoMatch m') sr)
+  in (checkNoMatch (fromMaybe (i,[]) (genVMatch d i (resolveOverlap 0 ms ms')))
     ++  (checkNoMatch $ fromMaybe (0,[]) ma), sp)
 
 checkNoMatch :: VMatch -> Matches
 checkNoMatch (0,[]) = []
 checkNoMatch v      = [v]
+
+separateLastMatch :: Split -> Split -> Matches -> (Matches,VMatch)
+separateLastMatch (SM (PatSplit _ _)) (SM (PatSplit _ _)) ms = (ms,(0,[]))
+separateLastMatch _                   (SM (PatSplit _ _)) ms = getLast ms
+separateLastMatch _                   _                   ms = (ms,(0,[]))
+
+getLast []  = ([],(0,[]))
+getLast [m] = ([],m)
+getLast ms  = (ms\\[last ms],last ms)
+
 
 scanStr :: Pattern -> (Pos,String) -> Split
 scanStr p (i,matchStr p i-> SM s)     = SM s
@@ -262,7 +342,7 @@ lenIncr (Str s)     = length s
 lenIncr (Chc _ _ _) = 1
 
 scan :: Pattern -> Input -> (Matches,Split)
-scan p (i,[])  = ([],NoMatch)
+scan p (i,[])   = ([],NoMatch)
 scan p (i,s:ss) = case scanSegment p (i,s) of
   (ms,NoMatch)  -> appendMatches ms (scan p (i+(lenIncr s),ss))
   (ms,split)    -> appendMatches ms (continue p (i+(lenIncr s)) ss split)
