@@ -153,7 +153,7 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- >>> match (seq [a,a,b]) [Str "a", Chc 1 [Str "bcaa"] [Str "c"], Str "abx"]
 -- [(1,[MChc 1 [(3,[MStr "a"])] [],MStr "ab"])]
 --
--- |Question: Should "ca" from the right alternative be matched? 
+-- |Question: Should "ca" from the right alternative be matched?
 -- |Answer: No. It shoudn't be matched because ca and cca are overlapping matches and
 --          ca in right starts before ca in left ends
 -- >>> match (VPM.seq [c,a]) [ Str "c", Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
