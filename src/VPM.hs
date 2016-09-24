@@ -363,6 +363,8 @@ seq (a:ps) = Seq a (seq ps)
 wild :: Pattern
 wild = Plain Wild
 
+-- examples
+--
 [a,b,c] = map ch "abc"
 
 ab = seq [a,b]
