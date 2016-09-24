@@ -11,6 +11,7 @@ data Atomic = C Char | Wild deriving(Show,Eq)
 data Pattern = Plain Atomic
              | Seq Pattern Pattern
              | Alt Pattern Pattern
+             | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
              deriving(Show,Eq)
 
 
