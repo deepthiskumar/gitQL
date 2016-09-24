@@ -12,7 +12,7 @@ vc1 = [Chc 1 [Str "mabn"] [Str "xca"], Str "c"]
 multipleAs =  [ Str "x",  Chc 1 ( [Str "aca"] ) ([Str "c"] )]
 share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 
--- |Case 1 - Only plain string
+-- | Case 1 - Only plain string
 -- >>> match ab v
 -- [(1,[MStr "ab"]),(4,[MStr "ab"])]
 -- >>> match abc v
@@ -123,21 +123,21 @@ share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
 -- [(0,[MChc 1 [(0,[MStr "abc"])] []]),(0,[MChc 1 [] [(3,[MStr "ab"])],MStr "c"])]
 -- >>> match abc [Chc 1 [Str "abcya"] [Str "lmnab"], Str "c"]
 -- [(0,[MChc 1 [(0,[MStr "abc"])] []]),(0,[MChc 1 [] [(3,[MStr "ab"])],MStr "c"])]
--- >>> match ((C 'b') `Seq` _a) [Chc 1 [Str "abcab"] [Str "lmnaba"], Str "aac"]
+-- >>> match ((Plain (C 'b')) `Seq` _a) [Chc 1 [Str "abcab"] [Str "lmnaba"], Str "aac"]
 -- [(0,[MChc 1 [(1,[MStr "bca"])] []]),(0,[MChc 1 [(4,[MStr "b"])] [],MStr "aa"]),(0,[MChc 1 [] [(4,[MStr "ba"])],MStr "a"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aac"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aac"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] [(3,[MStr "aba"])]]),(0,[MChc 1 [(3,[MStr "a"])] [],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aaca"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aaca"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] [(3,[MStr "aba"])]]),(0,[MChc 1 [(3,[MStr "a"])] [],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aaa"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaa"] [Str "lmnaba"], Str "aaa"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] [(3,[MStr "aba"])]]),(0,[MChc 1 [(3,[MStr "a"])] [],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmnabaa"], Str "aaa"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmnabaa"], Str "aaa"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] [(3,[MStr "aba"])]]),(0,[MChc 1 [(3,[MStr "ab"])] [],MStr "a"]),(0,[MChc 1 [] [(6,[MStr "a"])],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "ab"] [Str "a"], Str "aaaa"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "ab"] [Str "a"], Str "aaaa"]
 -- [(0,[MChc 1 [(0,[MStr "ab"])] [],MStr "a"]),(0,[MChc 1 [] [(0,[MStr "a"])],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmnabaa"], Str "aaaa"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmnabaa"], Str "aaaa"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] [(3,[MStr "aba"])]]),(0,[MChc 1 [(3,[MStr "ab"])] [],MStr "a"]),(0,[MChc 1 [] [(6,[MStr "a"])],MStr "aa"])]
--- >>> match ((C 'a') `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmabaa"], Str "aaaa"]
+-- >>> match ((Plain (C 'a')) `Seq` _a) [Chc 1 [Str "acaab"] [Str "lmabaa"], Str "aaaa"]
 -- [(0,[MChc 1 [(0,[MStr "aca"])] []]),(0,[MChc 1 [(3,[MStr "ab"])] [],MStr "a"]),(0,[MChc 1 [] [(5,[MStr "a"])],MStr "aa"])]
 --
 -- |Fixed: overlap between the matched value of StrSplit and PatSplit

@@ -9,7 +9,7 @@ import Data.List
 data Atomic = C Char | Wild deriving(Show,Eq)
 
 data Pattern = Plain Atomic
-             | Seq Atomic Pattern
+             | Seq Pattern Pattern
              | Alt Pattern Pattern
              deriving(Show,Eq)
 
@@ -92,8 +92,8 @@ matchStr :: Pattern -> Pos -> String -> Split
 matchStr (Plain (C d)) i (c:s)
                      | c==d    = SM $ StrSplit (i,[MStr[c]]) (i+1,vStr s)
 matchStr (Plain Wild) i (c:s)  = SM $ StrSplit (i,[MStr[c]]) (i+1,vStr s)
-matchStr (Seq a p)    i (c:[]) = matchStr (Plain a) i [c] `andThen` (SM (PatSplit (0,[]) p))
-matchStr (Seq a p)    i (c:s)  = matchStr (Plain a) i [c] `andThen` matchStr p (i+1) s
+matchStr (Seq a p)    i (c:[]) = matchStr a i [c] `andThen` (SM (PatSplit (0,[]) p))
+matchStr (Seq a p)    i (c:s)  = matchStr a i [c] `andThen` matchStr p (i+1) s
 matchStr (Alt p q)    i s      = matchStr p i s `orElse` matchStr q i s
 matchStr _          _   _      = NoMatch
 
@@ -358,13 +358,13 @@ ch = Plain . C
 
 seq :: [Pattern] -> Pattern
 seq [p]    = p
-seq (Plain a:ps) = Seq a (seq ps)
+seq (a:ps) = Seq a (seq ps)
 
 [a,b,c] = map ch "abc"
 
 ab = seq [a,b]
 abc = seq [a,b,c]
-_a = Wild `Seq` a
+_a = Seq (Plain Wild) a
 
 a'b = Alt a b
 
