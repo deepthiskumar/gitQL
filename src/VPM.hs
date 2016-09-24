@@ -360,6 +360,9 @@ seq :: [Pattern] -> Pattern
 seq [p]    = p
 seq (a:ps) = Seq a (seq ps)
 
+wild :: Pattern
+wild = Plain Wild
+
 [a,b,c] = map ch "abc"
 
 ab = seq [a,b]
