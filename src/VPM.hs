@@ -11,6 +11,8 @@ data Atomic = C Char | Wild deriving(Show,Eq)
 data Pattern = Plain Atomic
              | Seq Pattern Pattern
              | Alt Pattern Pattern
+             | Repeat Pattern Int {-min-} (Maybe Int) {-max-}
+             --Ex. `a*` => `Repeat (ch 'a') 0 None`
              | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
              deriving(Show,Eq)
 
@@ -363,6 +365,15 @@ seq (a:ps) = Seq a (seq ps)
 
 wild :: Pattern
 wild = Plain Wild
+
+star :: Pattern -> Pattern
+star x = Repeat x 0 Nothing
+
+plus :: Pattern -> Pattern
+plus x = Repeat x 1 Nothing
+
+possibly :: Pattern -> Pattern
+possibly x = Repeat x 0 (Just 1)
 
 -- examples
 --
