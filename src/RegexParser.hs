@@ -69,7 +69,8 @@ pr []          p l b = if b then error "Ended the regex while in a group."
 
 -- | Escape a character, erroring if it doesn't have an escape.
 escaped :: Char -> Char
-escaped x = if elem x ".|()" then x else undefined
+escaped x | elem x ".|()" = x
+escaped x = error ("Undefined character to escape: " ++ [x])
 
 -- | Sequence two patterns, eliminating `None`s where possible.
 sequence :: Pattern -> Pattern -> Pattern
