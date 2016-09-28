@@ -375,6 +375,46 @@ plus x = Repeat x 1 Nothing
 possibly :: Pattern -> Pattern
 possibly x = Repeat x 0 (Just 1)
 
+-- predicates
+--
+isWild :: Atomic -> Bool
+isWild Wild = True
+isWild _ = False
+
+isChar :: Atomic -> Bool
+isChar (C _) = True
+isChar _ = False
+
+
+isPlain :: Pattern -> Bool
+isPlain (Plain _) = True
+isPlain _ = False
+
+isSeq :: Pattern -> Bool
+isSeq (Seq _ _) = True
+isSeq _ = False
+
+isAlt :: Pattern -> Bool
+isAlt (Alt _ _) = True
+isAlt _ = False
+
+isRepeat :: Pattern -> Bool
+isRepeat (Repeat _ _ _) = True
+isRepeat _ = False
+
+isNone :: Pattern -> Bool
+isNone None = True
+isNone _ = False
+
+
+charMatch :: Atomic -> Char -> Bool
+charMatch Wild _ = True
+charMatch (C x) y = x == y
+
+repeatMatch :: Int -> Maybe Int -> Int -> Bool
+repeatMatch min (Just max) x = x >= min && x <= max
+repeatMatch min Nothing x = x >= min
+
 -- examples
 --
 [a,b,c] = map ch "abc"
