@@ -13,10 +13,14 @@ type Decision = (Dim, Bool)
 {-|
 >>> vmatch (ch '3') [Str "31"]
 [([0],[],"3")]
+>>> vmatch (ch '1') [Str "31"]
+[([1],[],"1")]
 >>> vmatch (Seq (ch '3') (ch '3')) [Str "31"]
 []
 >>> vmatch (Seq (ch '3') (ch '1')) [Str "31"]
 [([0],[],"31")]
+>>> vmatch (Seq (Alt (ch '3') (ch '1')) None) [Str "31"]
+[([0],[],"3"),([1],[],"1")]
 -}
 vmatch :: Pattern -> VString -> VMatches
 vmatch pat vstring =
