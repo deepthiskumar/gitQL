@@ -87,7 +87,6 @@ m (None:xs) vstring i pos sel repeat match continue =
   m xs vstring i pos sel repeat match continue
 m pat [] _ pos sel _ match continue = [((pos, sel, reverse match), null pat)]
 
--- | Discard the third argument if the second argument is a match with
--- the same selection as the first argument.
+-- | Discard the second argument if the first argument is all matches.
 matchMerge :: [(VMatch, Bool)] -> [(VMatch, Bool)] -> [(VMatch, Bool)]
 matchMerge a b = if all snd a then a else a ++ b
