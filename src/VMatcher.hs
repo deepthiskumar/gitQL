@@ -90,5 +90,4 @@ m pat [] _ pos sel _ match continue = [((pos, sel, reverse match), null pat)]
 -- | Discard the third argument if the second argument is a match with
 -- the same selection as the first argument.
 matchMerge :: [(VMatch, Bool)] -> [(VMatch, Bool)] -> [(VMatch, Bool)]
-matchMerge a _ | all snd a = a
 matchMerge a b = if all snd a then a else a ++ b
