@@ -19,7 +19,7 @@ vmatch pat vstring = fst (separate (vmatch' pat vstring [] [] []) [] [])
 vmatch' :: Pattern -> VString -> VString -> [Pos] -> Selection -> [(VMatch, Bool)]
 vmatch' _ [] _ _ _ = []
 vmatch' pat vstr@(Str s:xs) rest pos sel =
-  m [pat] vstr 0 pos sel pat "" True ++
+  m [pat] vstr 0 (0:pos) sel pat "" True ++
   vmatch' pat xs rest (head pos + 1 : tail pos) sel
 vmatch' pat (chc:xs) rest pos sel =
   concatMap (\ (x, newpos, newsel) -> vmatch' pat x (xs ++ rest) newpos newsel)
@@ -54,7 +54,7 @@ m pat (Str []:xs) _ pos sel repeat match _ =
   m pat xs 0 pos sel repeat match False
 m [] vstring i pos sel repeat match continue =
   let merged = (if continue
-                then matchMerge (m [repeat] vstring i (i:pos)
+                then matchMerge (m [repeat] vstring i pos
                                    sel repeat match continue)
                 else id) [((pos, sel, reverse match), True)] in
   if continue
