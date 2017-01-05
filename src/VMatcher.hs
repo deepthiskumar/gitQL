@@ -26,7 +26,7 @@ vmatch :: Pattern -> VString -> VMatches
 vmatch pat vstring =
   sortBy
   (\ (a, _, _) (b, _, _) -> compare a b)
-  (fst (separate (vmatch' pat vstring [] [] []) [] []))
+  (fst (separate (vmatch' pat vstring [] [0] []) [] []))
 
 vmatch' :: Pattern -> VString -> VString -> [Pos] -> Selection -> [(VMatch, Bool)]
 vmatch' _ [] _ _ _ = []
@@ -35,7 +35,7 @@ vmatch' pat (Str str:xs) rest pos sel =
   vmatch' pat xs rest (head pos + 1 : tail pos) sel
   where rep (s:ss) i =
           (++)                    -- matchMerge
-          (m [pat] (Str (s:ss):xs) i (i:pos) sel pat "" True)
+          (m [pat] (Str (s:ss):xs) i (i:tail pos) sel pat "" True)
           (rep ss (1+i))
         rep [] _ = []
 vmatch' pat (chc:xs) rest pos sel =
