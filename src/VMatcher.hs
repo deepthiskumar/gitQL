@@ -82,7 +82,7 @@ m (Repeat _ _ (Just 0):ps) vstring i pos sel repeat match continue =
   m ps vstring i pos sel repeat match continue
 m [Repeat _ 0 _] [] _ pos sel _ match _ = [((pos, sel, reverse match), True)]
 m (Repeat pat min max:ps) vstring i pos sel repeat match continue =
-  []
+  undefined
 m (None:xs) vstring i pos sel repeat match continue =
   m xs vstring i pos sel repeat match continue
 m pat [] _ pos sel _ match continue = [((pos, sel, reverse match), null pat)]
