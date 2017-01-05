@@ -12,6 +12,10 @@ type Decision = (Dim, Bool)
 {-|
 >>> vmatch (ch '3') [Str "31"]
 [([0],[],"3")]
+>>> vmatch (Seq (ch '3') (ch '3')) [Str "31"]
+[]
+>>> vmatch (Seq (ch '3') (ch '1')) [Str "31"]
+[([0],[],"31")]
 -}
 vmatch :: Pattern -> VString -> VMatches
 vmatch pat vstring = fst (separate (vmatch' pat vstring [] [] []) [] [])
@@ -26,6 +30,11 @@ vmatch' pat (chc:xs) rest pos sel =
             (chcHandler chc pos sel) ++
   vmatch' pat xs rest (head pos + 1 : tail pos) sel
 
+{-|
+>>> separate [(1,True),(3,True),(5,False),(2,True)] [5] [0]
+([2,3,1,5],[5,0])
+-}
+separate :: [(a, Bool)] -> [a] -> [a] -> ([a], [a])
 separate [] match unmatch = (match, unmatch)
 separate ((x, True):xs) match unmatch = separate xs (x:match) unmatch
 separate ((x, False):xs) match unmatch = separate xs match (x:unmatch)
