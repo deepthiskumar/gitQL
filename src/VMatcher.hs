@@ -2,6 +2,7 @@ module VMatcher (vmatch, VMatches, VMatch, Selection) where
 
 import VPM hiding (M, VMatches, VMatch, match)
 import Data.Maybe (fromJust, isJust)
+import Data.List (sortBy)
 
 type VMatches = [VMatch]
 type VMatch = ([Pos], Selection, String)
@@ -18,7 +19,10 @@ type Decision = (Dim, Bool)
 [([0],[],"31")]
 -}
 vmatch :: Pattern -> VString -> VMatches
-vmatch pat vstring = fst (separate (vmatch' pat vstring [] [] []) [] [])
+vmatch pat vstring =
+  sortBy
+  (\ (a, _, _) (b, _, _) -> compare a b)
+  (fst (separate (vmatch' pat vstring [] [] []) [] []))
 
 vmatch' :: Pattern -> VString -> VString -> [Pos] -> Selection -> [(VMatch, Bool)]
 vmatch' _ [] _ _ _ = []
