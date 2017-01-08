@@ -12,87 +12,124 @@ type Decision = (Dim, Bool)
 
 {-|
 >>> vmatch (ch '3') [Str "31"]
-[([0],[],"3")]
+[([0,0],[],"3")]
 >>> vmatch (ch '1') [Str "31"]
-[([1],[],"1")]
+[([0,1],[],"1")]
 >>> vmatch (Seq (ch '3') (ch '3')) [Str "31"]
 []
 >>> vmatch (Seq (ch '3') (ch '1')) [Str "31"]
-[([0],[],"31")]
+[([0,0],[],"31")]
 >>> vmatch (Seq (Alt (ch '3') (ch '1')) None) [Str "31"]
-[([0],[],"3"),([1],[],"1")]
+[([0,0],[],"3"),([0,1],[],"1")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Chc 1 [Str "ab"] [Str "cd"]]
+[([0,0,0,0],[(1,False)],"ab")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Chc 1 [Str "xab"] [Str "cd"]]
+[([0,0,0,1],[(1,False)],"ab")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Str "xyabc"]
+[([0,2],[],"ab")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Str "a", Str "b"]
+[([0,0],[],"ab")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Chc 1 [Str "a"] [], Chc 1 [Str "b"] []]
+[([0,0,0,0],[(1,False)],"ab")]
+>>> vmatch (Seq (ch 'a') (ch 'a')) [Chc 1 [Str "a"] [], Str "aa"]
+[([0,0,0,0],[(1,False)],"aa"),([1,0],[],"aa")]
+>>> vmatch (Repeat (ch 'a') 2 (Just 2)) [Chc 1 [Str "a"] [], Str "aa"]
+[([0,0,0,0],[(1,False)],"aa"),([1,0],[],"aa")]
+>>> vmatch (Repeat (ch 'a') 2 Nothing) [Chc 1 [Str "a"] [], Str "aa"]
+[([0,0,0,0],[(1,False)],"aaa"),([1,0],[],"aa")]
 -}
 vmatch :: Pattern -> VString -> VMatches
 vmatch pat vstring =
   sortBy
   (\ (a, _, _) (b, _, _) -> compare a b)
-  (fst (separate (vmatch' pat vstring [] [0] []) [] []))
-
-vmatch' :: Pattern -> VString -> VString -> [Pos] -> Selection -> [(VMatch, Bool)]
-vmatch' _ [] _ _ _ = []
-vmatch' pat (Str str:xs) rest pos sel =
-  rep str 0 ++
-  vmatch' pat xs rest (head pos + 1 : tail pos) sel
-  where rep (s:ss) i =
-          (++)                    -- matchMerge
-          (m [pat] (Str (s:ss):xs) i (i:tail pos) sel pat "" True)
-          (rep ss (1+i))
-        rep [] _ = []
-vmatch' pat (chc:xs) rest pos sel =
-  concatMap (\ (x, newpos, newsel) -> vmatch' pat x (xs ++ rest) newpos newsel)
-            (chcHandler chc pos sel) ++
-  vmatch' pat xs rest (head pos + 1 : tail pos) sel
+  (map
+   (\ (a, b, c) -> (reverse a, b, reverse c))
+   (map fst . filter snd $ vmatch' pat vstring [] 0 [0] []))
 
 {-|
->>> separate [(1,True),(3,True),(5,False),(2,True)] [5] [0]
-([2,3,1,5],[5,0])
+>>> vmatch' (Seq (ch 'a') (ch 'b')) [Chc 1 [Str "a"] [], Chc 1 [Str "b"] []] [] 0 [0] []
+[(([0,0,0,0],[(1,False)],"ba"),True),(([0,0,0,1],[(1,False)],""),False)]
 -}
-separate :: [(a, Bool)] -> [a] -> [a] -> ([a], [a])
-separate [] match unmatch = (match, unmatch)
-separate ((x, True):xs) match unmatch = separate xs (x:match) unmatch
-separate ((x, False):xs) match unmatch = separate xs match (x:unmatch)
+vmatch' :: Pattern -> VString -> VString -> Pos -> [Pos] -> Selection -> [(VMatch, Bool)]
+vmatch' _ _ _ _ [] _ = undefined
+vmatch' _ [] _ _ _ _ = []
+vmatch' pat (Str str:xs) rest index (p:ps) sel =
+  rep str 0 ++
+  vmatch' pat xs rest (index + 1) (p+1 : ps) sel
+  where rep (s:ss) i =
+          (++)                    -- matchMerge
+          (m [pat] (Str (s:ss):xs) rest 0 (i:index:ps) True sel pat "" False)
+          (rep ss (1+i))
+        rep [] _ = []
+vmatch' pat (chc:xs) rest index pos@(p:ps) sel =
+  concatMap (\(x, newpos, newsel) -> vmatch' pat x (xs ++ rest) 0 (index:newpos) newsel)
+            (chcHandler chc pos sel True) ++
+  vmatch' pat xs rest (index + 1) (p + 1 : ps) sel
 
-chcHandler :: Segment -> [Pos] -> Selection -> [(VString, [Pos], Selection)]
-chcHandler (Chc dim a b) pos sel =
+chcHandler :: Segment -> [Pos] -> Selection -> Bool -> [(VString, [Pos], Selection)]
+chcHandler (Chc dim a b) pos sel updatePos =
   case lookup dim sel of
     Just False -> [left sel]
     Just True -> [right sel]
     Nothing -> [left ((dim, False):sel), right ((dim, True):sel)]
-  where left = c a 0
-        right = c b 1
-        c x p sel = (x, (p:tail pos), sel)
+  where left newsel = (a, maybePush updatePos 0 pos, newsel)
+        right newsel = (b, maybePush updatePos 1 pos, newsel)
 
-m :: [Pattern] -> VString -> Pos -> [Pos] -> Selection -> Pattern -> String -> Bool -> [(VMatch, Bool)]
--- m pat vstring i pos sel repeat match continue
-m pat (Chc dim a b:xs) _ pos sel repeat match continue =
-  case lookup dim sel of
-    Just False -> left sel
-    Just True -> right sel
-    Nothing -> left ((dim, False):sel) ++ right ((dim, True):sel)
-  where left sel = c sel a 0
-        right sel = c sel b 1
-        c sel x p = m pat (x++xs) 0 (0:p:tail pos) sel repeat match continue
-m pat (Str []:xs) _ pos sel repeat match _ =
-  m pat xs 0 pos sel repeat match False
-m [] vstring i pos sel repeat match continue =
-  [((pos, sel, reverse match), True)]
-m (Plain p:ps) (Str (c:cs):xs) i pos sel repeat match continue =
+maybePush :: Bool -> a -> [a] -> [a]
+maybePush True x xs = x:xs
+maybePush False _ xs = xs
+
+{-|
+>>> let pat = Seq (ch 'a') (ch 'b') in m [pat] [Chc 1 [Str "a"] [], Chc 1 [Str "b"] []] [] 0 [] True [] pat "" False
+[(([0,0],[(1,False)],"ba"),True),(([1,0,1,0],[(1,True)],""),False)]
+-}
+{-|
+>>> let pat = (Repeat (ch 'a') 2 Nothing) in m [pat] [Chc 1 [Str "a"] []] [Str "a"] 0 [] True [] pat "" False
+[(([0,0],[(1,False)],"aa"),True),(([1,0],[(1,True)],""),False)]
+>>> let pat = (Repeat (ch 'a') 2 Nothing) in m [pat] [Chc 1 [Str "a"] []] [Str "aa"] 0 [] True [] pat "" False
+[(([0,0],[(1,False)],"aaa"),True),(([1,0],[(1,True)],""),False)]
+-}
+m :: [Pattern] -> VString -> VString -> Pos -> [Pos] -> Bool -> Selection -> Pattern -> String -> Bool -> [(VMatch, Bool)]
+-- m pat vstring rest vstringIndex pos updatePos sel repeat match started
+m _ [] _ _ pos _ sel _ match False = [((pos, sel, match), False)]
+m [] _ _ _ pos _ sel _ match _ = [((pos, sel, match), True)]
+m pat (chc@(Chc _ _ _):xs) rest vstringIndex pos updatePos sel repeat match started =
+  concatMap (\(x, newpos, newsel) -> m pat (x++xs) rest 0 newpos updatePos
+                                       newsel repeat match started)
+            (chcHandler chc (maybePush updatePos vstringIndex pos) sel updatePos)
+m pat [] (chc@(Chc _ _ _):rest) vstringIndex pos updatePos sel repeat match started =
+  concatMap (\(x, newpos, newsel) -> m pat [] (x++rest) 0 newpos updatePos
+                                       newsel repeat match started)
+            (chcHandler chc (maybePush updatePos vstringIndex pos) sel updatePos)
+m pat (Str []:xs) rest _ pos _ sel repeat match started =
+  m pat xs rest undefined pos False sel repeat match started
+m pat [] (Str []:rest) _ pos _ sel repeat match started =
+  m pat [] rest undefined pos False sel repeat match started
+m (Plain p:ps) (Str (c:cs):xs) rest _ pos _ sel repeat match _ =
   if charMatch p c
-  then m ps (Str cs:xs) (1+i) pos sel repeat (c:match) continue
-  else [((pos, sel, reverse match), False)]
-m (Seq a b:ps) vstring i pos sel repeat match continue =
-  m (a:b:ps) vstring i pos sel repeat match continue
-m (Alt a b:ps) vstring i pos sel repeat match continue =
-  matchMerge (m (a:ps) vstring i pos sel repeat match continue)
-             (m (b:ps) vstring i pos sel repeat match continue)
-m (Repeat _ _ (Just 0):ps) vstring i pos sel repeat match continue =
-  m ps vstring i pos sel repeat match continue
-m [Repeat _ 0 _] [] _ pos sel _ match _ = [((pos, sel, reverse match), True)]
-m (Repeat pat min max:ps) vstring i pos sel repeat match continue =
-  undefined
-m (None:xs) vstring i pos sel repeat match continue =
-  m xs vstring i pos sel repeat match continue
-m pat [] _ pos sel _ match continue = [((pos, sel, reverse match), null pat)]
+  then m ps (Str cs:xs) rest undefined pos False sel repeat (c:match) True
+  else [((pos, sel, match), False)]
+m (Plain p:ps) [] (Str (c:cs):rest) _ pos _ sel repeat match _ =
+  if charMatch p c
+  then m ps [] (Str cs:rest) undefined pos False sel repeat (c:match) True
+  else [((pos, sel, match), False)]
+m (Seq a b:ps) vstring rest vstringIndex pos updatePos sel repeat match started =
+  m (a:b:ps) vstring rest vstringIndex pos updatePos sel repeat match started
+m (Alt a b:ps) vstring rest vstringIndex pos updatePos sel repeat match started =
+  matchMerge (m (a:ps) vstring rest vstringIndex pos updatePos sel repeat match started)
+             (m (b:ps) vstring rest vstringIndex pos updatePos sel repeat match started)
+m (Repeat _ _ (Just 0):ps) vstring rest vstringIndex pos updatePos sel repeat match started =
+  m ps vstring rest vstringIndex pos updatePos sel repeat match started
+m (Repeat _ 0 _:xs) [] [] vstringIndex pos updatePos sel repeat match started =
+  m xs [] [] vstringIndex pos updatePos sel repeat match started
+m (Repeat pat min max:ps) vstring rest vstringIndex pos updatePos sel repeat match started =
+  m (pat:Repeat pat (unsignedDec min) (fmap unsignedDec max):ps)
+    vstring rest vstringIndex pos updatePos sel repeat match started
+  where unsignedDec 0 = 0
+        unsignedDec n = n-1
+m (None:xs) vstring rest vstringIndex pos updatePos sel repeat match started =
+  m xs vstring rest vstringIndex pos updatePos sel repeat match started
+m pat [] [] _ pos _ sel _ match _ = [((pos, sel, match), null pat)]
 
 -- | Discard the second argument if the first argument is all matches.
 matchMerge :: [(VMatch, Bool)] -> [(VMatch, Bool)] -> [(VMatch, Bool)]
