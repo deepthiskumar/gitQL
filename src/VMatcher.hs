@@ -1,4 +1,4 @@
-module VMatcher (vmatch, VMatches, VMatch, Selection) where
+module VMatcher (vmatch, VMatches, VMatch, Selection, Decision) where
 
 import VPM hiding (M, VMatches, VMatch, match)
 import Data.Maybe (fromJust, isJust)
