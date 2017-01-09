@@ -234,8 +234,13 @@ d1 = PChc (DVar "d") ab (seq $ map ch "ac")
 -- >>> match d1 [Str "a", Chc 1 [Str "b"] [Str "c"], Chc 1 [Str "ab"] [Str "ac"]]
 -- [VM [1] 0 [MStr "a",MChc 1 [VM [] 0 [MStr "b"]] [VM [] 0 [MStr "c"]]],VM [1] 2 [MChc 1 [VM [] 0 [MStr "ab"]] [VM [] 0 [MStr "ac"]]]]
 -- >>> match d [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "b"]]
+-- [VM [2] 0 [MChc 2 [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]] [VM [] 0 [MStr "b"]]]]
 -- >>> match d [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "x"]]
+-- [VM [] 0 [MChc 2 [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]] []]]
 -- >>> match d [Chc 2 [Str "a"] [Chc 1 [Str "a"] [Str "b"]]]
+-- [VM [2] 0 [MChc 2 [VM [] 0 [MStr "a"]] [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]]]
+-- >>> match d [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
+-- [VM [] 0 [MChc 2 [] [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]]]
 -- 
 
 

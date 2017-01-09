@@ -591,24 +591,31 @@ scanChoicePattern pat@(PChc (D d) p q) (i,Chc dim v1 v2)
 scanChoicePattern pat@(PChc (DVar d) p q) (i,Chc dim v1 v2) = 
    let ls = (scan pat (0,v1))
        rs = (scan pat (0,v2))
-   in {-trace (show ls ++ show rs) (-}case (varCPEmpty ls, varCPEmpty rs) of
-      (True, True)   -> scanChoicePattern' dim i True pat (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p)) (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))--(scan p (0,v1)) (scan q (0,v2))
+   in {--trace (show dim ++ ": " ++ show ls ++ show rs) (--}case (varCPEmpty ls, varCPEmpty rs) of
+      (True, True)   -> let l = (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p))
+                            r = (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))
+                        in {--trace (show dim ++ "in : " ++ show l ++ show r) (--}scanChoicePattern' dim i True pat l r --) --(scan p (0,v1)) (scan q (0,v2))
       (True, False)  -> scanChoicePattern' dim i True pat (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p)) {-(scan p (0,v1))-} rs
-      (False, True)  -> scanChoicePattern' dim i True pat ls (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))--(scan q (0,v2))
-      (False, False) -> scanChoicePattern' dim i False pat ls rs--)
+      (False, True)  -> let m = (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))
+                        in {--trace ("Right Match : "++show m ) (--}scanChoicePattern' dim i True pat ls m --)--(scan q (0,v2))
+      (False, False) -> scanChoicePattern' dim i False pat ls rs --)
 scanChoicePattern pat (i,Str s) = 
     case matchStr pat i s of
       (SM (PatSplit m (PChc _ p p'))) -> ([], SM (PatSplit m (PChc (dimVar pat) p p')))
       sp                              -> ([],sp)
 
 scanChoicePattern' ::  Dim -> Pos -> Bool -> Pattern -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)  -- scanChoicePattern' = undefined
-scanChoicePattern' d i inD _ (ms,NoMatch) (ms',NoMatch) = (checkNoMatch (fromMaybe (VM [] i []) (genVMatch d (addDim inD d) i ({-resolveOverlap 0 ms ms'-}ms,ms'))),NoMatch)
-scanChoicePattern' d i inD _ (ms,NoMatch) (ms',sp) 
-  | inD       = ([],createSP False True d i sp) 
+scanChoicePattern' d i inD _ (ms,NoMatch) (ms',NoMatch) = {-trace ("patern' : " ++show ms ++ show ms') (-} (checkNoMatch (fromMaybe (VM [] i []) (genVMatch d (addDim ((not $ null ms) && (not $ null ms')) d) i ({-resolveOverlap 0 ms ms'-}ms,ms'))),NoMatch)--)
+scanChoicePattern' d i inD p (ms,NoMatch) (ms',sp) 
+  | inD       = {-trace (show d) (-}case isNoMatch sp of
+                                      True -> scanChoicePattern' d i inD p (ms,NoMatch) (ms',NoMatch)
+                                      False -> ([],createSP False True i d sp ms ms') --)
   | otherwise = undefined 
 --TODO Add NoMatch, Also rigid match would return strsplit if there was a no match so check accordingly
-scanChoicePattern' d i inD _ (ms,sp) (ms',NoMatch)
-  | inD       = ([],createSP True True d i sp) 
+scanChoicePattern' d i inD p (ms,sp) (ms',NoMatch)
+  | inD       = case isNoMatch sp of
+                                      True -> scanChoicePattern' d i inD p (ms,NoMatch) (ms',NoMatch)
+                                      False -> ([],createSP True True i d sp ms ms') 
   | otherwise = undefined
 scanChoicePattern' d i inD _ (ms,SM (StrSplit m (_,[]))) (ms',SM (StrSplit m' (_,[]))) 
   | inD       = ([] {-ms++ms'-},SM $ StrSplit ( VM [d] i [MChc d [m] [m']]) (i+1,[]))
@@ -618,6 +625,11 @@ scanChoicePattern' d i inD pat (ms,SM (PatSplit m p)) (ms',SM (PatSplit m' p'))
 scanChoicePattern' d i inD _ (ms,SM (StrSplit m (_,[]))) (ms',SM (PatSplit m' p)) = undefined {-Not sure of the scenario-}
 scanChoicePattern' d i inD _ (ms,SM (PatSplit m p)) (m's,SM (StrSplit m' (_,[]))) = undefined {-Not sure of the scenario-}
 scanChoicePattern' d i inD pat ms ms' = {-trace (show ms ++ "  " ++ show ms')-} ([],NoMatch)
+
+-- rigid match would return strsplit if there was a no match so check accordingly
+isNoMatch :: Split -> Bool
+isNoMatch (SM (StrSplit (VM [] 0 []) _ )) = True
+isNoMatch _                               = False
 
 dimVar :: Pattern -> DimVar
 dimVar (PChc d _ _) = d
@@ -631,11 +643,11 @@ addDim :: Bool -> Dim -> [Dim]
 addDim True d   = [d]
 addDim False d  = [] 
 
-createSP :: Bool -> Bool -> Pos -> Dim -> Split -> Split
-createSP left inD i d (SM (StrSplit m (_,[]))) 
-  | left      = (SM (StrSplit (VM (addDim inD d) i [MChc d [m] []]) (i+1,[])))
-  | otherwise = (SM (StrSplit (VM (addDim inD d) i [MChc d [] [m]]) (i+1,[])))
-createSP _ _ _ _ _= undefined
+createSP :: Bool -> Bool -> Pos -> Dim -> Split -> Matches -> Matches -> Split
+createSP left inD i d (SM (StrSplit m (_,[]))) ms ms'
+  | left      = (SM (StrSplit (VM (addDim inD d) i [MChc d (ms++[m]) ms']) (i+1,[])))
+  | otherwise = (SM (StrSplit (VM (addDim inD d) i [MChc d ms (ms'++[m])]) (i+1,[])))
+createSP _ _ _ _ _ _ _= undefined
 --createSP left d (SM (PatSplit m' p))
 
 varCPEmpty :: (Matches,Split) -> Bool
