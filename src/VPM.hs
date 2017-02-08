@@ -12,13 +12,14 @@ data Atomic = C Char | Wild deriving(Show,Eq)
 data Pattern = Plain Atomic
              | Seq Pattern Pattern
              | Alt Pattern Pattern
-             | PChc DimVar Pattern Pattern
+             | PChc DimTy Pattern Pattern
              | Repeat Pattern Int {-min-} (Maybe Int) {-max-}
              --Ex. `a*` => `Repeat (ch 'a') 0 None`
              | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
              deriving(Show,Eq)
 
-data DimVar = D Dim | DVar String deriving(Show,Eq)
+type DimVarName = String
+data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
 type VString = [Segment]
 
 type Dim = Int
@@ -27,10 +28,13 @@ data Segment = Str String | Chc Dim VString VString
              deriving(Show, Eq)
 
 --Each match could be have multiple dimensions in it.
+-- Eg: d<abc,xby> # A<a,x>bB<c,y> --> A<a,x>bB<c,y> | d = {A,B}
 --Therefore we have a list of dimensions instead of just
--- one dimesions for each corresponding dimension variable
--- in the choice pattern.
+
+type DimVars = Maybe (DimVarName,[Dim])
+
 data VMatch = VM [Dim] Pos [Match] deriving(Show,Eq)
+--data VMatch = VM DimVars Pos [Match] deriving(Show,Eq)
 
 data Match = MStr String | MChc Dim [VMatch] [VMatch]
             deriving(Show,Eq)
@@ -584,7 +588,7 @@ scanSegment p (i,Chc dim v1 v2) = scanChoice dim i (scan p (0,v1)) (scan p (0,v2
 
 scanChoicePattern :: Pattern -> (Pos,Segment) -> (Matches,Split)
 scanChoicePattern pat@(PChc (D d) p q) (i,Chc dim v1 v2) 
-   | d == dim  = scanChoicePattern' dim i True pat
+   | d == dim  = scanChoicePattern' dim i False pat--True pat
       (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p)) 
       (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))-- should be match and not scan -- (scan p (0,v1)) (scan q (0,v2))
    | otherwise   = scanChoicePattern' dim i False pat (scan pat (0,v1)) (scan pat (0,v2)) --TODO??
@@ -631,7 +635,7 @@ isNoMatch :: Split -> Bool
 isNoMatch (SM (StrSplit (VM [] 0 []) _ )) = True
 isNoMatch _                               = False
 
-dimVar :: Pattern -> DimVar
+dimVar :: Pattern -> DimTy
 dimVar (PChc d _ _) = d
 
 formPatSplit :: Pattern -> Pattern -> Pattern -> Pattern

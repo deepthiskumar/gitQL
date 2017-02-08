@@ -18,6 +18,7 @@ cp1 = PChc (D 1) ab (seq $ map ch "ac")
 cp2 = PChc (D 1) a a
 d = PChc (DVar "d") (ch 'a') (ch 'b')
 d1 = PChc (DVar "d") ab (seq $ map ch "ac")
+np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
 
 -- | Case 1 - Only plain string
 -- >>> match ab v
@@ -242,5 +243,8 @@ d1 = PChc (DVar "d") ab (seq $ map ch "ac")
 -- >>> match d [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
 -- [VM [] 0 [MChc 2 [] [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]]]
 -- 
+-- nested Matches
+-- >>> match (PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'c') )) ([Chc 1 [Str "a"] [Chc 2 [Str "b"] [Str "c"]]])
+-- [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [2] 0 [MChc 2 [VM [] 0 [MStr "b"]] [VM [] 0 [MStr "c"]]]]]]
 
 
