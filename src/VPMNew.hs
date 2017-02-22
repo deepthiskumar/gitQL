@@ -44,7 +44,18 @@ data Pos = P Block (Either Offset (Pos,Pos))
          | NoPos
          deriving(Show,Eq)
          
-type DimEnv = [(String,[Dim])]
+instance Ord Pos where
+  NoPos <= NoPos = True
+  P b o <= NoPos = False
+  NoPos <= P b o = True
+  P b o <= P b' o' 
+    | b < b' = True
+    | b > b' = False
+    | b == b' = case (o,o') of
+                 (Left i, Left i') -> i <= i
+                 (Right (p,p'), Right (q,q')) -> p <= q && p' <= q' --TODO For p<=q and p' > q' we need to merge the vstring to equalize the offsets.   
+         
+type DimEnv = [(String,Dim)]
 
 type QVarEnv = [(String, VMatch)]
 
@@ -75,21 +86,57 @@ vgrep p vs = fst (scan p (nextBlock NoPos vs,vs))
 scan :: Pattern -> Input -> (Matches,Split)
 scan _ (_, [])     = ([],NoMatch)
 scan p (i,[v])   = case scanSegment p i v of
-   (ms,(SM (StrSplit m s))) -> appendMatches (m:ms) (scan p s)
+   (ms,(SM (StrSplit m s))) -> appendMatches ((checkEmpty m)++ms) (scan p s)
    ms                       -> ms
 scan p (i, v:vs) = case scanSegment p i v of
   (ms,NoMatch)  -> appendMatches ms (scan p (nextBlock i vs, vs))
-  (ms,(SM (StrSplit m (j,s')))) -> appendMatches (m:ms) (scan p (j,s'++vs))
-  (ms,(SM (PatSplit m p')))  -> case rigidMatch p' ((getblock i) + 1) vs of--appendMatches ms (continue p (nextBlock i) vs split)
+  (ms,(SM (StrSplit m (j,s')))) -> appendMatches ((checkEmpty m)++ms) (scan p (j,s'++vs))
+  (ms,(SM (PatSplit m p')))  -> case match m p' ((getblock i)+1) vs of
+    (ms', SM(StrSplit _ inp)) -> appendMatches (ms++ms') (scan p inp)
+    (ms', _) -> (ms++ms',NoMatch)
+  (ms,PM sp@(StrSplit m (j,s')) ps) -> case matchPatSplits i vs ps of
+     []  -> appendMatches (ms) (addMatch m (scan p (j,s'++vs)))
+     (sps) -> appendMatches (ms ++ (concatMap fst sps)) (addMatch m (scan p (getShortestSegment (((SM sp): (map snd sps))))))
+
+{-match :: FinalMatch -> Pattern -> Pattern -> Pos -> VString -> (Matches,Split)
+match m p p' i vs = case rigidMatch p' ((getblock i) + 1) vs of
+  ([],NoMatch)           -> let (pos,vs') = rewind ((fst.fst.fst) m, ((snd.fst) m) ++ vs)
+                            in  (scan p (pos, vs')) --rewind
+  (ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> appendMatches (map (appendVM m) ms') (scan p s)
+  (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} appendMatches (map (appendVM m) (m':ms')) (scan p s)
+  (ms',sp@(SM(PatSplit m' p'')))-> (ms',sp)--(((map (appendVM m) ms') ++ ms),sp) --Input exhausted-}
+  
+match :: FinalMatch -> Pattern -> Block -> VString -> (Matches,Split)
+match m p i [] = ([], SM (PatSplit m p))
+match m p i vs = case rigidMatch p i vs of
+  ([],NoMatch)           -> let (pos,vs') = rewind ((fst.fst.fst) m, ((snd.fst) m) ++ vs)
+                            in  ([], SM(StrSplit emptyMatch (pos, vs'))) --rewind
+  (ms',NoMatch)           -> (map (appendVM m) ms',SM(StrSplit emptyMatch (NoPos,[])))
+  (ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> (map (appendVM m) ms',SM(StrSplit emptyMatch s))
+  (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} (map (appendVM m) (m':ms'),SM(StrSplit emptyMatch s)) 
+  (ms',sp@(SM(PatSplit m' p')))-> (ms',sp)--(((map (appendVM m) ms') ++ ms),sp) --Input exhausted
+  (ms',sp) -> trace (show ms' ++ "||"++show sp) undefined
+
+
+{-case rigidMatch p' ((getblock i) + 1) vs of--appendMatches ms (continue p (nextBlock i) vs split)
      ([],NoMatch)           -> let (pos,vs') = rewind ((fst.fst.fst) m, ((snd.fst) m) ++ vs)
                                in  appendMatches ms (scan p (pos, vs')) --rewind
      (ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> appendMatches ((map (appendVM m) ms') ++ ms) (scan p s)
      (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} appendMatches ((map (appendVM m) (m':ms')) ++ ms) (scan p s)
-     (ms',sp@(SM(PatSplit m' p'')))-> (ms',sp)--(((map (appendVM m) ms') ++ ms),sp)
-  (ms,PM (StrSplit m (j,s')) ps) ->
-    let ms = matchPatSplits i vs ps
+     (ms',sp@(SM(PatSplit m' p'')))-> (ms',sp)--(((map (appendVM m) ms') ++ ms),sp)-}
+    
+matchPatSplits :: Pos -> VString -> [SplitTy] -> [(Matches,Split)]
+matchPatSplits _ vs []                   = []
+matchPatSplits i vs ((PatSplit m p):ps) = case rigidMatch p ((getblock i) + 1) vs of--appendMatches ms (continue p (nextBlock i) vs split)
+     ([],NoMatch)           -> let s = rewind ((fst.fst.fst) m, ((snd.fst) m) ++ vs) --Just return the remaining vs to be scanned
+                               in  ([],SM $ StrSplit emptyMatch s) : matchPatSplits i vs ps--rewind
+     sp@(ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> sp : matchPatSplits i vs ps
+     (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} (map (appendVM m) (m':ms'),SM $ StrSplit emptyMatch s) :matchPatSplits i vs ps
+     (ms',sp@(SM(PatSplit m' p'')))-> (ms',sp) : matchPatSplits i vs ps--(((map (appendVM m) ms') ++ ms),sp)
+
   
 scanSegment :: Pattern -> Pos -> Segment -> (Matches,Split)
+scanSegment p@(PChc _ _ _) i s                        = scanChoicePattern p i s
 scanSegment p i (Str s)                               = 
   ([],scanStr p (i, s))
 scanSegment p i@(P b (Right (lpos,rpos))) (Chc d l r) = 
@@ -97,6 +144,77 @@ scanSegment p i@(P b (Right (lpos,rpos))) (Chc d l r) =
   in {-trace ("Scan Segment" ++ show p ++ show i ++ ","++ show (l,r) ++ " , "++show (scan p (lpos,l))++" , "++ show (scan p (rpos,r))++" , "++ show c)-} c 
 --scanSegment p i (Chc d l r)                           = 
 --  combineAlternatives d i (scan p (startPos,l)) (scan p (startPos,r))
+
+scanChoicePattern :: Pattern -> Pos-> Segment -> (Matches,Split)
+scanChoicePattern pat@(PChc (D d) p q) pos (Chc dim v1 v2) 
+   | d == dim   = (combine pos dim (D d) (match ((((getLeftPos pos),[]),[]),[]) p (getblock $ getLeftPos pos) v1) (match ((((getRightPos pos),[]),[]),[]) q (getblock $ getRightPos pos) v2))
+   -- (match emptyMatch p (getLeftPos pos) v1)  (match emptyMatch q (getRightPos pos) v2)
+   | otherwise  = (combineAlternatives dim pos (scan pat (getLeftPos pos, v1)) (scan pat (getRightPos pos,v2))) -- Will not produces any extra matches. matches in each alternative is combined into one single match
+scanChoicePattern pat@(PChc (DVar d) p q) pos (Chc dim v1 v2) = 
+  (combineAlternatives dim pos (scan pat (getLeftPos pos, v1)) (scan pat (getRightPos pos,v2))) `or'` 
+   (combine pos dim (DVar d)(match ((((getLeftPos pos),[]),[]),[]) p (getblock $ getLeftPos pos) v1) (match ((((getRightPos pos),[]),[]),[]) q (getblock $ getRightPos pos) v2))
+scanChoicePattern pat@(PChc dy _ _) i (Str s) = case matchStr pat i s of --In case of sharing
+      (SM (PatSplit m (PChc _ p q))) -> ([],SM (PatSplit m (PChc dy p q)))
+      sp@(SM(StrSplit m s))          -> ([],sp)
+      otherwise                      -> ([],NoMatch)
+  
+combine :: Pos -> Dim -> DimTy -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
+combine pos d dy a@(ms, SM(StrSplit ma (_,[]))) b@(ms', SM(StrSplit ma' (_,[]))) =
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock pos,[])))
+combine pos d dy (ms, SM(PatSplit m p)) (ms', SM(PatSplit m' q)) =
+  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM(PatSplit (combineAlternative d pos m m') (PChc dy p q)))
+  -- TODO should match only the same dimension if the next segment is a choice
+combine _ _ _ _ _                           = ([],NoMatch)
+
+or' :: (Matches,Split) -> (Matches,Split) -> (Matches,Split)
+or' ([],NoMatch) ms = ms
+or' ms _  = ms
+
+{-
+scanChoicePattern :: Pattern -> Pos-> Segment -> (Matches,Split)
+scanChoicePattern pat@(PChc (D d) p q) (i,Chc dim v1 v2) 
+   | d == dim  = scanChoicePattern' dim i False pat--True pat
+      (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p)) 
+      (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))-- should be match and not scan -- (scan p (0,v1)) (scan q (0,v2))
+   | otherwise   = scanChoicePattern' dim i False pat (scan pat (0,v1)) (scan pat (0,v2)) --TODO??
+scanChoicePattern pat@(PChc (DVar d) p q) (i,Chc dim v1 v2) = 
+   let ls = (scan pat (0,v1))
+       rs = (scan pat (0,v2))
+   in {--trace (show dim ++ ": " ++ show ls ++ show rs) (--}case (varCPEmpty ls, varCPEmpty rs) of
+      (True, True)   -> let l = (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p))
+                            r = (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))
+                        in {--trace (show dim ++ "in : " ++ show l ++ show r) (--}scanChoicePattern' dim i True pat l r --) --(scan p (0,v1)) (scan q (0,v2))
+      (True, False)  -> scanChoicePattern' dim i True pat (continueInNext p 0 v1 (PatSplit (VM [] 0 []) p)) {-(scan p (0,v1))-} rs
+      (False, True)  -> let m = (continueInNext q 0 v2 (PatSplit (VM [] 0 []) q))
+                        in {--trace ("Right Match : "++show m ) (--}scanChoicePattern' dim i True pat ls m --)--(scan q (0,v2))
+      (False, False) -> scanChoicePattern' dim i False pat ls rs --)
+scanChoicePattern pat (i,Str s) = 
+    case matchStr pat i s of
+      (SM (PatSplit m (PChc _ p p'))) -> ([], SM (PatSplit m (PChc (dimVar pat) p p')))
+      sp                              -> ([],sp)
+
+scanChoicePattern' ::  Dim -> Pos -> Bool -> Pattern -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)  -- scanChoicePattern' = undefined
+scanChoicePattern' d i inD _ (ms,NoMatch) (ms',NoMatch) = {-trace ("patern' : " ++show ms ++ show ms') (-} (checkNoMatch (fromMaybe (VM [] i []) (genVMatch d (addDim ((not $ null ms) && (not $ null ms')) d) i ({-resolveOverlap 0 ms ms'-}ms,ms'))),NoMatch)--)
+scanChoicePattern' d i inD p (ms,NoMatch) (ms',sp) 
+  | inD       = {-trace (show d) (-}case isNoMatch sp of
+                                      True -> scanChoicePattern' d i inD p (ms,NoMatch) (ms',NoMatch)
+                                      False -> ([],createSP False True i d sp ms ms') --)
+  | otherwise = undefined 
+--TODO Add NoMatch, Also rigid match would return strsplit if there was a no match so check accordingly
+scanChoicePattern' d i inD p (ms,sp) (ms',NoMatch)
+  | inD       = case isNoMatch sp of
+                                      True -> scanChoicePattern' d i inD p (ms,NoMatch) (ms',NoMatch)
+                                      False -> ([],createSP True True i d sp ms ms') 
+  | otherwise = undefined
+scanChoicePattern' d i inD _ (ms,SM (StrSplit m (_,[]))) (ms',SM (StrSplit m' (_,[]))) 
+  | inD       = ([] {-ms++ms'-},SM $ StrSplit ( VM [d] i [MChc d [m] [m']]) (i+1,[]))
+  | otherwise = undefined --extract the dimensions from m and m' coz there have been matches in them
+scanChoicePattern' d i inD pat (ms,SM (PatSplit m p)) (ms',SM (PatSplit m' p')) 
+   =   ([],SM (PatSplit (VM (addDim inD d) i [MChc d [m] [m']] ) (formPatSplit p p' pat)))
+scanChoicePattern' d i inD _ (ms,SM (StrSplit m (_,[]))) (ms',SM (PatSplit m' p)) = undefined {-Not sure of the scenario-}
+scanChoicePattern' d i inD _ (ms,SM (PatSplit m p)) (m's,SM (StrSplit m' (_,[]))) = undefined {-Not sure of the scenario-}
+scanChoicePattern' d i inD pat ms ms' = {-trace (show ms ++ "  " ++ show ms')-} ([],NoMatch)
+-}
   
 {-continue :: Pattern -> Pos -> VString -> Split -> (Matches,Split)
 continue p i v (SM (StrSplit m (j,s')))      = addMatch m (scan p (j,s'++v))
@@ -109,14 +227,15 @@ rigidMatch p b []     = ([],NoMatch)
 rigidMatch p b (v:vs) = case (matchSegment p b v) of
   (ms,NoMatch)                 -> {-trace ("NoMatch" ++ show p ++ show v)-}(ms,NoMatch)
   (ms,SM (StrSplit m (pos,s))) -> {-trace ("StrSplit "++ show v ++ "Next " ++show (m, pos, s++vs))-} (ms,SM (StrSplit m (pos,s++vs)))
-  (ms,SM (PatSplit m p'))      -> {-trace ("PatSplit "++show p' ++ show m ++ show vs)-} appendMatches ms (rigidMatch p' (b+1) vs)
+  (ms,SM (PatSplit m p'))      -> {-trace ("PatSplit "++show p' ++ show m ++ show vs)-} appendMatches ms (match m p' (b+1) vs)
 
 matchSegment :: Pattern -> Block-> Segment -> (Matches,Split)
-matchSegment p b (Str s)       = let ma = ([],matchStr p (P b (Left 0) ) s) in {-trace ("match segment STR " ++ show p ++ show s ++ " , " ++(show (snd ma)))-} ma
-matchSegment p b (Chc d v1 v2) = 
+matchSegment p@(PChc _ _ _) b s =  (scanChoicePattern p (nextBlock (P (b-1) (Left 0) ) [s]) s )
+matchSegment p b (Str s)        = let ma = ([],matchStr p (P b (Left 0) ) s) in{- trace ("match segment STR " ++ show p ++ show s ++ " , " ++(show (snd ma)))-} ma
+matchSegment p b (Chc d v1 v2)  = 
   let l = rigidMatch p 0 v1
       r = rigidMatch p 0 v2
-  in {-trace ("MatchSegment " ++ show l ++ " , " ++ show r)-} combineAlternatives d (P b (Right (startPos,startPos))) (fst l,makeStrSplit (snd l) (nextBlock NoPos v1,v1))
+  in {-trace ("MatchSegment " ++ show l ++ " , " ++ show r) -} combineAlternatives d (P b (Right (startPos,startPos))) (fst l,makeStrSplit (snd l) (nextBlock NoPos v1,v1))
    (fst r,makeStrSplit (snd r) (nextBlock NoPos v2,v2)) 
 
 {-trace (show ((rigidMatch p 0 v1)) ++ " AND " ++ show (rigidMatch p 0 v2) ) snd $ 
@@ -141,9 +260,6 @@ combineAlternatives d p (ms,split) (ms',split')     =
   let (ms'',sp) = mergeAlt d p split split'
   in ((map (addAlternative L d p) ms)++(map (addAlternative R d p) ms')++ms'',
    sp) --Check for overlapping
-
-
-
 
 
 
@@ -197,13 +313,13 @@ matchStr (Plain (C d)) pos (c:s)
                                                        (incOffset pos,vStr s)
 matchStr (Plain Wild) pos (c:s)       = SM $ StrSplit (((pos,[]),[Str[c]]),[]) 
                                                        (incOffset pos,vStr s)
-matchStr (Seq a p)    pos (c:[])      = let m = matchStr a pos [c] `andThen` (SM (PatSplit (((startPos,[]),[]),[]) p))
- in {-trace (show m)-} m
+matchStr (Seq a p)    pos (c:[])      = matchStr a pos [c] `andThen` 
+  (SM (PatSplit (((startPos,[]),[]),[]) p))
 matchStr (Seq a p)    pos (c:s)       = matchStr a pos [c] `andThen` 
   matchStr p (incOffset pos) s
 matchStr (Alt p q)    pos s           = matchStr p pos s `orElse` 
   matchStr q pos s
-matchStr (PChc (_) p q) pos s         = matchStr p pos s `and'` 
+matchStr (PChc (_) p q) pos s         = matchStr p pos s `and'`
   matchStr q pos s
 matchStr _          _   _             = NoMatch
 
@@ -250,6 +366,16 @@ incOffset (P b (Left o)) = P b (Left (o+1))
 incBlock :: Pos -> Pos
 incBlock NoPos   = NoPos
 incBlock (P b o) = P (b+1) o 
+
+getLeftPos :: Pos -> Pos
+getLeftPos NoPos               = startPos
+getLeftPos (P _ (Left _))      = startPos
+getLeftPos (P _ (Right (l,_))) = l
+
+getRightPos :: Pos -> Pos
+getRightPos NoPos               = startPos
+getRightPos (P _ (Left _))      = startPos
+getRightPos (P _ (Right (_,r))) = r
 
 orElse :: Split -> Split -> Split
 orElse NoMatch s   = s
@@ -324,6 +450,12 @@ addAlternative a d p m
 addAlternative a d p ((((pos,dimEnv),vs),varEnv)) = 
   (((insertPos a p pos NoPos,dimEnv),[choice a d vs []]), varEnv)
 
+combineAlternative :: Dim -> Pos -> FinalMatch -> FinalMatch -> FinalMatch
+combineAlternative d p m m'
+ | isEmptyMatch m  || isEmptyMatch m' = emptyMatch
+combineAlternative d pos ((((l,dimEnv),vs),varEnv)) ((((r,dimEnv'),vs'),varEnv')) = 
+ (((insertPos Both pos l r,dimEnv++dimEnv'),[Chc d vs vs']),varEnv++varEnv')
+
 --wrap the matches within split with the choice and create a single split
 
 mergeAlt :: Dim -> Pos -> Split -> Split ->  (Matches,Split)
@@ -350,7 +482,7 @@ mergeAlt' s []                          = s
 mergeAlt' (ms, SM s1@(StrSplit _ _)) ps = (ms, PM s1 ps)
 mergeAlt' (ms, SM s1@(PatSplit _ _)) ps = 
   (ms, PM (StrSplit emptyMatch (NoPos,[]) ) (s1:ps))
-mergeAlt' (ms, PM s ps') ps             = (ms, PM s (ps'++ps))
+mergeAlt' (ms, PM s ps') ps             = (ms, PM s (ps'++ps)) 
 
 
 wrapChoice :: Dim -> Pos -> SplitTy -> SplitTy -> (Matches, Split)
@@ -378,13 +510,38 @@ rewind (p@(P b (Right (l,r))), (Chc d v1 v2):vs) =
 rewind i = trace (show i) undefined
     
 makeStrSplit :: Split -> Input -> Split
-makeStrSplit NoMatch inp = SM (StrSplit emptyMatch inp)
+makeStrSplit NoMatch inp = (SM (StrSplit emptyMatch inp))
 makeStrSplit sp _        = sp
 
 checkEmpty :: FinalMatch -> [FinalMatch]
 checkEmpty m 
  | m ==emptyMatch = []
  |otherwise       = [m]
+ 
+getShortestSegment :: [Split] -> Input
+getShortestSegment [] = (NoPos,[])
+getShortestSegment (SM (StrSplit m (i,v)) : ss) = shortestSegment (i,v) (getShortestSegment ss)
+getShortestSegment (_ : ss)                = getShortestSegment ss
+     
+shortestSegment :: Input -> Input -> Input
+shortestSegment (j,s) (j',s') 
+  | j < j'     = (j',s')
+  | otherwise  = (j,s)
+ 
+
+isEmptyMatch :: FinalMatch -> Bool
+isEmptyMatch (((_,_),[]),_) = True
+isEmptyMatch _              = False 
+  
+combine'' :: Pos -> Dim -> DimTy -> FinalMatch -> FinalMatch -> FinalMatch
+combine'' p d dy (((l,dimVars),vs),qvars) (((r,dimVars'),vs'),qvars') = {-trace (show p ++ " | Left: "++ show l ++ "| Right: "++show r)-}
+  (((insertPos Both p l r, updateDimEnv dy d (dimVars ++ dimVars')),[Chc d vs vs'] ), qvars++qvars')
+  
+updateDimEnv :: DimTy -> Dim -> DimEnv -> DimEnv
+updateDimEnv (D _) _ dimenv = dimenv
+updateDimEnv (DVar d) dim dimenv = (d,dim) : dimenv
+
+
 
 
 
