@@ -37,6 +37,14 @@ type Decision = (Dim, Bool)
 [([0,0,0,0],[(1,False)],"aa"),([1,0],[],"aa")]
 >>> vmatch (Repeat (ch 'a') 2 Nothing) [Chc 1 [Str "a"] [], Str "aa"]
 [([0,0,0,0],[(1,False)],"aaa"),([1,0],[],"aa")]
+>>> vmatch (Seq (ch 'a') (ch 'b')) [Str "ababcab"]
+[([0,0],[],"ab"),([0,2],[],"ab"),([0,5],[],"ab")]
+>>> vmatch (Repeat (Seq (ch 'a') (ch 'b')) 0 (Just 1)) [Str "ababcab"]
+[([0,0],[],"ab"),([0,2],[],"ab"),([0,5],[],"ab")]
+-}
+{-|
+>>> vmatch (Repeat (Seq (ch 'a') (ch 'b')) 0 Nothing) [Str "ababcab"]
+[([0,0],[],"abab"),([0,5],[],"ab")]
 -}
 vmatch :: Pattern -> VString -> VMatches
 vmatch pat vstring =
@@ -90,7 +98,7 @@ maybePush False _ xs = xs
 m :: [Pattern] -> VString -> VString -> Pos -> [Pos] -> Bool -> Selection -> String -> Bool -> [(VMatch, Bool)]
 -- m pat vstring rest vstringIndex pos updatePos sel match started
 m _ [] _ _ pos _ sel match False = [((pos, sel, match), False)]
-m [] _ _ _ pos _ sel match _ = [((pos, sel, match), True)]
+m [] _ _ _ pos _ sel match started = [((pos, sel, match), started)]
 m pat (chc@(Chc _ _ _):xs) rest vstringIndex pos updatePos sel match started =
   concatMap (\(x, newpos, newsel) -> m pat (x++xs) rest 0 newpos updatePos
                                        newsel match started)
@@ -120,14 +128,22 @@ m (Repeat _ _ (Just 0):ps) vstring rest vstringIndex pos updatePos sel match sta
   m ps vstring rest vstringIndex pos updatePos sel match started
 m (Repeat _ 0 _:xs) [] [] vstringIndex pos updatePos sel match started =
   m xs [] [] vstringIndex pos updatePos sel match started
+m (Repeat pat 0 max:xs) vstring rest vstringIndex pos updatePos sel match started =
+  concatMap (\ x@((newpos, newsel, _), matched) ->
+              if matched then [x]
+              else m xs vstring rest vstringIndex newpos updatePos newsel match started)
+            (m (pat:Repeat pat 0 (fmap unsignedDec max):xs) vstring rest
+               vstringIndex pos updatePos sel match started)
 m (Repeat pat min max:ps) vstring rest vstringIndex pos updatePos sel match started =
   m (pat:Repeat pat (unsignedDec min) (fmap unsignedDec max):ps)
     vstring rest vstringIndex pos updatePos sel match started
-  where unsignedDec 0 = 0
-        unsignedDec n = n-1
 m (None:xs) vstring rest vstringIndex pos updatePos sel match started =
   m xs vstring rest vstringIndex pos updatePos sel match started
 m pat [] [] _ pos _ sel match _ = [((pos, sel, match), null pat)]
+
+unsignedDec :: Int -> Int
+unsignedDec 0 = 0
+unsignedDec n = n-1
 
 -- | Discard the second argument if the first argument is all matches.
 matchMerge :: [(VMatch, Bool)] -> [(VMatch, Bool)] -> [(VMatch, Bool)]
