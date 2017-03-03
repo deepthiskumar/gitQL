@@ -48,7 +48,13 @@ cp2 = PChc (D 1) a a
 cp3 = PChc (D 1) (seq $ map ch "ba") (seq $ map ch "ca")
 d0 = PChc (DVar "d") (ch 'a') (ch 'b')
 d1 = PChc (DVar "d") ab (seq $ map ch "ac")
+d2 = PChc (DVar "d") (seq $ map ch "ba") (seq $ map ch "ca")
 np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
+
+--Query variables
+qv = PChc (D 1) (ch 'a') (QVar "x")
+qv1 = PChc (DVar "d") (ch 'a') (QVar "x")
+rqv = PChc (DVar "d") (QVar "x") (ch 'b')
 
 -- |doctests
 -- | String without any variations
@@ -169,7 +175,7 @@ np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
 -- >>> vgrep (seq [c,a]) [ Str "x",  Chc 1 ( [Str "xba"] ) ([Str  "c"] ), Str "a"]
 -- [(((P 1 (Right (NoPos,P 0 (Left 0))),[]),[Chc 1 [] [Str "c"],Str "a"]),[])]
 
--- |TODO PM
+-- |PM
 -- >>> vgrep ab [Chc 1 [Str "xa"] [Str "ya"], Str "b"]
 -- [(((P 0 (Right (P 0 (Left 1),NoPos)),[]),[Chc 1 [Str "a"] [],Str "b"]),[]),(((P 0 (Right (NoPos,P 0 (Left 1))),[]),[Chc 1 [] [Str "a"],Str "b"]),[])]
 -- >>> vgrep abc [Chc 1 [Str "abcyab"] [Str "lmnab"], Str "c"]
@@ -260,6 +266,8 @@ np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
 -- |Dimension Variable
 -- >>> vgrep d0 [Chc 2 [Str "a"] [Str "b"]]
 -- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",2)]),[Chc 2 [Str "a"] [Str "b"]]),[])]
+-- >>> vgrep d0 [Str "xy", Chc 2 [Str "a"] [Str "b"]]
+-- [(((P 1 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",2)]),[Chc 2 [Str "a"] [Str "b"]]),[])]
 -- >>> vgrep d0 [Chc 1 [Str "a"] [Str "b"]]
 -- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[])]
 -- >>> vgrep d0 [Chc 1 [Str "ax"] [Str "by"]]
@@ -267,15 +275,17 @@ np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
 -- >>> vgrep d0 [Str "xy", Chc 2 [Str "a"] [Str "b"]]
 -- [(((P 1 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",2)]),[Chc 2 [Str "a"] [Str "b"]]),[])]
 -- >>> vgrep d0 [Str "xy", Chc 1 [Str "a"] [Str "b"]]
--- [VM [1] 2 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]
+-- [(((P 1 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[])]
 -- >>> vgrep d0 [Chc 1 [Str "a"] [Str "b"], Str "xy"]
--- [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]] 
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[])] 
 -- >>> vgrep d0 [Chc 1 [Str "a"] [Str "b"], Str "xy", Chc 1 [Str "a"] [Str "b"]]
--- [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]],VM [1] 3 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[]),(((P 2 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[])]
+-- >>> vgrep d0 [Chc 1 [Str "a"] [Str "b"], Str "xy", Chc 2 [Str "a"] [Str "b"]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[]),(((P 2 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",2)]),[Chc 2 [Str "a"] [Str "b"]]),[])]
 -- >>> vgrep d1 [Chc 1 [Str "ab"] [Str "ac"]]
--- [VM [1] 0 [MChc 1 [VM [] 0 [MStr "ab"]] [VM [] 0 [MStr "ac"]]]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "ab"] [Str "ac"]]),[])]
 -- >>> vgrep d1 [Str "a", Chc 1 [Str "b"] [Str "c"]]
--- [VM [1] 0 [MStr "a",MChc 1 [VM [] 0 [MStr "b"]] [VM [] 0 [MStr "c"]]]]
+-- [(((P 0 (Left 0),[("d",1)]),[Str "a",Chc 1 [Str "b"] [Str "c"]]),[])]
 -- >>> vgrep d1 [Str "ab", Chc 1 [Str "b"] [Str "c"]]
 -- []
 -- >>> vgrep d1 [Str "a", Chc 1 [Str "bx"] [Str "c"]]
@@ -285,19 +295,44 @@ np = PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'b') )
 -- >>> vgrep d1 [Str "a", Chc 1 [Str "bx"] [Str "cy"]]
 -- []
 -- >>> vgrep d1 [Str "a", Chc 1 [Str "b"] [Str "c"], Chc 1 [Str "ab"] [Str "ac"]]
--- [VM [1] 0 [MStr "a",MChc 1 [VM [] 0 [MStr "b"]] [VM [] 0 [MStr "c"]]],VM [1] 2 [MChc 1 [VM [] 0 [MStr "ab"]] [VM [] 0 [MStr "ac"]]]]
+-- [(((P 0 (Left 0),[("d",1)]),[Str "a",Chc 1 [Str "b"] [Str "c"]]),[]),(((P 2 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "ab"] [Str "ac"]]),[])]
 -- >>> vgrep d [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "b"]]
--- [VM [2] 0 [MChc 2 [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]] [VM [] 0 [MStr "b"]]]]
+-- []
 -- >>> vgrep d [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "x"]]
--- [VM [] 0 [MChc 2 [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]] []]]
+-- []
 -- >>> vgrep d [Chc 2 [Str "a"] [Chc 1 [Str "a"] [Str "b"]]]
--- [VM [2] 0 [MChc 2 [VM [] 0 [MStr "a"]] [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]]]
+-- []
 -- >>> vgrep d [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
--- [VM [] 0 [MChc 2 [] [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [] 0 [MStr "b"]]]]]]
+-- []
+
+-- | nested matches in both the alternatives TODO CHECK IF THE BEHAVIOR IS CORRECT 
+-- >>> vgrep d0 [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "b"]]
+-- [(((P 0 (Right (P 0 (Right (P 0 (Left 0),P 0 (Left 0))),NoPos)),[("d",1)]),[Chc 2 [Chc 1 [Str "a"] [Str "b"]] []]),[])]
+-- >>> vgrep d0 [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "x"]]
+-- [(((P 0 (Right (P 0 (Right (P 0 (Left 0),P 0 (Left 0))),NoPos)),[("d",1)]),[Chc 2 [Chc 1 [Str "a"] [Str "b"]] []]),[])]
+-- >>> vgrep d0 [Chc 2 [Str "a"] [Chc 1 [Str "a"] [Str "b"]]]
+-- [(((P 0 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1)]),[Chc 2 [] [Chc 1 [Str "a"] [Str "b"]]]),[])]
+-- >>> vgrep d0 [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
+-- [(((P 0 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1)]),[Chc 2 [] [Chc 1 [Str "a"] [Str "b"]]]),[])]
+-- >>>vgrep d2 [Chc 1 [Str "b"] [Str "c"],Str "a"]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[]),[Chc 1 [Str "b"] [Str "c"],Str "a"]),[])]
+
 -- 
--- nested Matches
+-- |nested Matches
 -- >>> vgrep (PChc (DVar "d") a (PChc (DVar "d1") (ch 'b') (ch 'c') )) ([Chc 1 [Str "a"] [Chc 2 [Str "b"] [Str "c"]]])
--- [VM [1] 0 [MChc 1 [VM [] 0 [MStr "a"]] [VM [2] 0 [MChc 2 [VM [] 0 [MStr "b"]] [VM [] 0 [MStr "c"]]]]]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1),("d1",2)]),[Chc 1 [Str "a"] [Chc 2 [Str "b"] [Str "c"]]]),[])]
+
+-- | query variables
+-- >>> vgrep qv [Chc 1 [Str "a"] [Str "b"]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[]),[Chc 1 [Str "a"] [Str "b"]]),[("x",((P 0 (Right (NoPos,P 0 (Left 0))),[]),[Chc 1 [] [Str "b"]]))])]
+-- >>> vgrep qv1 [Chc 1 [Str "a"] [Str "b"]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "b"]]),[("x",((P 0 (Right (NoPos,P 0 (Left 0))),[]),[Chc 1 [] [Str "b"]]))])]
+-- >>> vgrep qv1 ([Chc 1 [Str "a"] [Chc 2 [Str "b"] [Str "c"]]])
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1)]),[Chc 1 [Str "a"] [Chc 2 [Str "b"] [Str "c"]]]),[("x",((P 0 (Right (NoPos,P 0 (Left 0))),[]),[Chc 1 [] [Chc 2 [Str "b"] [Str "c"]]]))])]
+-- >>> vgrep rqv ([Str "efg", Chc 1 [Str "a"] [Chc 2 [Str "c"] [Str "b"]]])
+-- [(((P 1 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",2)]),[Chc 1 [] [Chc 2 [Str "c"] [Str "b"]]]),[("x",((P 1 (Right (NoPos,P 0 (Right (P 0 (Left 0),NoPos)))),[]),[Chc 1 [] [Chc 2 [Str "c"] []]]))])]
+
+
 
 
 
