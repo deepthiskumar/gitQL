@@ -1,0 +1,206 @@
+% preamble
+\documentclass{acm_proc_article-sp}
+
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{tikz}
+\usepackage{verbatim}
+\usepackage{cc}
+%\usepackage[hidelinks]{hyperref}
+% lstlisting settings
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    %language=scala,
+    %numbers=left,
+    numberstyle=\ttfamily\small,
+    %showspaces=true,
+    %showtabs=true,
+    mathescape=true,
+    %frame=single
+}
+
+% tikz settings/libraries
+\usetikzlibrary{arrows}
+\usetikzlibrary{shapes}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{matrix}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{fit}
+
+% version history styles
+\tikzstyle{mytext} = [font=\scriptsize]
+\tikzstyle{myhead} = [
+    mytext,
+    text centered,
+    text width=3em,
+    inner sep=2pt,
+    rectangle,
+    minimum height=1em,
+    fill=red!20
+]
+\tikzstyle{mycode} = [
+    mytext,
+    text width=13em,
+    inner sep=2pt,
+    rectangle,
+    draw
+]
+\tikzstyle{mycomm} = [
+    mytext,
+    text centered,
+    text width=3em,
+    inner sep=2pt,
+    rectangle,
+    rounded corners,
+minimum height=1em
+]
+\tikzstyle{myyc} = [
+    mycomm,
+    fill=yellow!40
+]
+\tikzstyle{myrc} = [
+    mycomm,
+    fill=red!20
+]
+
+% flow diagram styles
+\tikzstyle{mycond} = [
+    mytext,
+    text width=5em,
+    inner sep=0pt,
+    diamond,
+    draw,
+    fill=blue!20,
+    text badly centered
+]
+\tikzstyle{myblock} = [
+    mytext,
+    text width=4em,
+    inner sep=2pt,
+    rectangle,
+    draw,
+    text centered,
+    rounded corners
+]
+\tikzstyle{mygb} = [
+    myblock,
+    fill=green!20
+]
+\tikzstyle{myrb} = [
+    myblock,
+    fill=red!20
+]
+\tikzstyle{mycloud} = [
+    mytext,
+    draw, 
+    ellipse,
+    fill=red!20
+]
+\tikzstyle{myarrow} = [
+    draw,
+    -latex'
+]
+
+% defined commands
+%\newcommand{\mytodo}[1]{{\color{red}\textbf{TODO:}}~#1}
+\newcommand{\mytodo}[1]{%
+    \par%
+    \medskip%
+    \noindent%
+    %\fbox{%
+    \parbox[s][1.4\height][c]{\columnwidth}{%
+        {\color{red}\textbf{TODO:}}~#1%
+    }%
+    %}%
+    \newline%
+}
+
+\newcommand{\myc}[3]{\ensuremath{#1\langle #2,#3\rangle}}
+\newcommand{\myl}[1]{\ensuremath{#1}}
+\newcommand{\myr}[1]{\ensuremath{\bar{#1}}}
+\newcommand{\info}[1]{\color{blue}[#1]}
+\newcommand{\gql}{GitQL}
+
+\newcommand*{\ttf}{\fontfamily{cmvtt}\selectfont}
+
+\setlength\extrarowheight{4pt}
+
+\vfuzz2pt % allow overflow by 2 points
+\hfuzz2pt % allow overflow by 2 points
+
+
+\title{Git Query Language and Variational Grep\\% 
+    %CS~561 Fall~2015\\%
+    %Final Project%
+    \titlenote{%
+        Does NOT produce the permission block, copyright information nor page numbering.
+        For use with \lstinline|sig-alternate-05-2015.cls|.
+        Supported by ACM.
+    }%
+}
+\numberofauthors{2}
+\author{
+    \alignauthor
+    %Deepthi Satish Kumar\\
+    %\affaddr{College of Electrical Engineering and Computer Science}\\
+    %\affaddr{Oregon State University}\\
+    %\affaddr{Corvallis, OR}\\
+    %\email{kumarde@oregonstate.edu}
+    %\alignauthor
+    %Spencer Hubbard\\
+    %\affaddr{College of Electrical Engineering and Computer Science}\\
+    %\affaddr{Oregon State University}\\
+    %\affaddr{Corvallis, OR}\\
+    %\email{hubbarsp@oregonstate.edu}
+}
+
+\begin{document}
+    % front matter
+    \maketitle
+    
+    % main matter
+    \begin{abstract}
+        %\input{abstract.tex}
+    \end{abstract}
+    \category{D.2.3}{Software Engineering}{Coding Tools and Techniques}%[Program editors]
+    \terms{Design, Languages, Theory}
+    \keywords{variation, version history, pattern matching, grep}
+    
+    
+%    \section{Introduction}\label{sec:intro}
+    \input{Introduction.tex}
+         
+%    \section{Background}\label{sec:back}
+%    \input{background.tex}
+    
+%    \newpage
+    
+%    \section{Motivation}\label{sec:motiv}
+%    \input{motivation.tex}
+   
+%    \section{Solution}\label{sec:sol}
+%    A choice pattern is a pattern that is used to represent changes.
+%    Choice Pattern : $$ d<P1,P2> $$
+    
+%A change consists of a state before and a state after. Therefore, to query a particular change, we specify a regular expression ($P1$) for the state before and a regular expression for the state after ($P2$).
+%The 
+    %\input{sol.tex}
+    
+%    \section{Results}\label{sec:res}
+%    \input{res.tex}
+
+%    \section{Related Work}\label{sec:rw}
+%    \input{rw.tex}
+    
+%    \section{Conclusion}\label{sec:conc}
+%    \input{conc.tex}
+%    \newpage
+    
+    % back matter
+    \bibliographystyle{abbrv}
+    \bibliography{reference}
+\end{document}

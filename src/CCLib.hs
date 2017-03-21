@@ -7,8 +7,9 @@ module CCLib where
   import Text.ParserCombinators.Parsec
   import Text.ParserCombinators.Parsec.Char
   import qualified Data.Algorithm.Diff as D
+  import Data.List.Split
   --import qualified Diff as D
-  import VPM
+  import VPMNew
   --import Pretty
   --import Data.Vector.Unboxed as Uvector  hiding ((++),concat,length,tail,map,take,drop,concatMap,maximum,reverse)
 
@@ -44,7 +45,7 @@ module CCLib where
 --let v = f k x in v `seq` Tip k v
 -- gives the diff output. custom diff so that the 'Both' data contructor can be changed to take only single argument 
 --and identify different typed of changes ie., change, delete, insert
-  (-?-) :: [Char] -> [Char] -> [Diff Char]
+  (-?-) :: [String] -> [String] -> [Diff String]
   old -?- new = collectDiff $ D.getGroupedDiff old new
 
 
@@ -135,7 +136,11 @@ module CCLib where
     right <- many ccConstruct
     string escape
     char '>'
-    return $! Chc (read dim :: Int) left right
+    return $! Chc (read dim :: Int) (epsilon left) (epsilon right)
+  
+  epsilon :: VString -> VString
+  epsilon [] = [Str ""]
+  epsilon vs = vs
 
   ccParser :: String -> Either ParseError VString
   ccParser = parse ccFile ""
@@ -182,7 +187,7 @@ module CCLib where
   applySelection :: [Sel] -> VString -> Text
   applySelection s v = fst $! applySelectionWithMap s v
 
-  asSelectedIn :: Int -> [Sel] -> Alt
+  asSelectedIn :: Int -> [Sel] -> Alternative
   asSelectedIn d ((LSel d'):ss) = if d == d' then L else d `asSelectedIn` ss
   asSelectedIn d ((RSel d'):ss) = if d == d' then R else d `asSelectedIn` ss
 
@@ -259,7 +264,7 @@ sepSegments xs = case last xs of --last takes O(n). Use sequence which has const
   distill dim v s n = normalize $! fst $! l pv d
     where
       (o, m) = s `applySelectionWithMap` v
-      d = partitionDiff (o -?- n) $! map fst m
+      d = partitionDiff ((wordsBy (==' ') o) -?- (wordsBy (==' ') n)) $! map fst m
       pv = denormalizeV s v $! diffBoundaries d
 
       (^:) :: Segment-> (VString, [Diff Char]) -> (VString, [Diff Char])

@@ -305,6 +305,7 @@ rqv = PChc (DVar "d") (QVar "x") (ch 'b')
 -- >>> vgrep d [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
 -- []
 
+
 -- | nested matches in both the alternatives TODO CHECK IF THE BEHAVIOR IS CORRECT 
 -- >>> vgrep d0 [Chc 2 [Chc 1 [Str "a"] [Str "b"]] [Str "b"]]
 -- [(((P 0 (Right (P 0 (Right (P 0 (Left 0),P 0 (Left 0))),NoPos)),[("d",1)]),[Chc 2 [Chc 1 [Str "a"] [Str "b"]] []]),[])]
@@ -332,6 +333,11 @@ rqv = PChc (DVar "d") (QVar "x") (ch 'b')
 -- >>> vgrep rqv ([Str "efg", Chc 1 [Str "a"] [Chc 2 [Str "c"] [Str "b"]]])
 -- [(((P 1 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",2)]),[Chc 1 [] [Chc 2 [Str "c"] [Str "b"]]]),[("x",((P 1 (Right (NoPos,P 0 (Right (P 0 (Left 0),NoPos)))),[]),[Chc 1 [] [Chc 2 [Str "c"] []]]))])]
 
+-- | Query variables on split choices and empty strings
+-- >>> vgrep (PChc (DVar "d") (ab) (QVar "x")) [Chc 1 [Str "a"] [Str "lm"], Chc 1 [Str "b"] [Str "op"]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "a"] [Str "lm"],Chc 1 [Str "b"] [Str "op"]]),[("x",((P 0 (Right (NoPos,P 0 (Left 0))),[]),[Chc 1 [] [Str "lm"],Chc 1 [] [Str "op"]]))])]
+-- >>> vgrep (PChc (DVar "d") (ab) (QVar "x")) [Chc 2 [Str ""] [Str "xy"],Chc 1 [Str "a"] [Str "lm"], Chc 1 [Str "b"] [Str "op"]]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 2 [Str ""] [Str "xy"],Chc 1 [Str "a"] [Str "lm"],Chc 1 [Str "b"] [Str "op"]]),[("x",((P 0 (Right (NoPos,P 0 (Left 0))),[]),[Chc 2 [] [Str "xy"],Chc 1 [] [Str "lm"],Chc 1 [] [Str "op"]]))])]
 
 
 

@@ -1,20 +1,24 @@
 import CCLib
-import VPM
-import Prelude hiding (readFile)
+import VPMNewTest
+import VPMNew
+import Prelude hiding (readFile,seq)
 import System.IO.Strict (readFile)
 import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import Control.Exception as Exc
 import Data.List (nub)
 
+resultFile :: FilePath
+resultFile = "/home/eecs/Documents/CS583/gitRepo/repo2/res.txt"
+
 run :: Pattern -> FilePath -> IO ()
 run pattern vFile = do 
      v <- parseText vFile
-     print $ showMatch $ match pattern v
+     writeFile resultFile (showMatch $ vgrep pattern v)
      
 showMatch :: Matches -> String
 showMatch [] = ""
-showMatch (m:ms) = show m ++ "\n" ++ showMatch ms
+showMatch (m:ms) = show m ++ "\n \n" ++ showMatch ms
 
 parseText :: FilePath -> IO VString
 parseText vFile= do

@@ -64,6 +64,11 @@ vString ((pos,_),vs) = (pos,vs)
 getMatch :: FinalMatch -> Input
 getMatch (((pos,_),vs),_) = (pos,vs)
 
+listDim :: VString -> [Dim]
+listDim [] = []
+listDim (Str _ : vs) = listDim vs
+listDim (Chc d _ _ : vs) = d: listDim vs
+
 -- Sub query
 multiVgrep :: Pattern -> [Input] -> Matches
 multiVgrep _ [] = []
