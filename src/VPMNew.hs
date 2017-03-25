@@ -15,12 +15,13 @@ data Pattern = Plain Atomic
              | Repeat Pattern Int {-min-} (Maybe Int) {-max-}
              --Ex. `a*` => `Repeat (ch 'a') 0 None`
              | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
-             | QVar String
+             | QVar QVarName
              deriving(Show,Eq)
              
 type DimVarName = String
 data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
 
+type QVarName = String
 type VString = [Segment]
 
 type Dim = Int
@@ -485,6 +486,10 @@ getDimEnv = snd.fst.fst
 
 getMatchVS :: FinalMatch -> VString
 getMatchVS = snd.fst
+
+getDim :: DimVarName -> DimEnv -> Maybe Int
+getDim d ds = lookup d ds
+
 
 
 

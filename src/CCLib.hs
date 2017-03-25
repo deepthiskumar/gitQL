@@ -108,6 +108,28 @@ module CCLib where
   showSegment :: Segment -> String
   showSegment (Str t)     = t
   showSegment (Chc d v v') = showChcNoColor d (map showVString [v,v'])-}
+  
+  --tokenizes into words and also maintains the spaces between them as tokens.
+  tokenizer :: String -> [String]
+  tokenizer "" = []
+  tokenizer s = 
+    let (spaces, s1) = break (/=' ') s
+        (lines, s2)  = break (/='\n') s1
+        (line, s3)   = break (=='\n') s2
+        words        = getwords line
+        (nlines,s4)  = break (/= '\n') s3
+    in noEmpty spaces ++ noEmpty lines ++ words ++ noEmpty nlines ++ tokenizer s4
+    
+  getwords :: String -> [String]
+  getwords ""    = []
+  getwords line  = 
+   let (word, s1)   = break (==' ') line
+       (spaces, s2) = break (/=' ') s1
+   in noEmpty word ++ noEmpty spaces ++ getwords s2
+   
+  noEmpty :: String -> [String]
+  noEmpty "" = []
+  noEmpty s  = [s]
 
 --  Parsers
 --------------------------------------------------------------------------------
@@ -209,15 +231,15 @@ module CCLib where
           e f x y = ((f $! Chc dim) x' y) ^: (d s vs bs')
             where
               (x', bs') = d s x bs
-      d s ((Str x):vs) (b:bs) = case length x `compare` b of
+      d s ((Str x):vs) (b:bs) = case length (tokenizer x) `compare` b of
         EQ -> (Str x) ^: (d s vs $! tail bs')
         LT -> (Str x) ^: (d s vs bs'')
-        GT -> (Str x') ^: (d s ((Str x''):vs) $! tail bs')
+        GT -> (Str (concat x')) ^: (d s ((Str (concat x'')):vs) $! tail bs')
         where
           bs'   = map (subtract b) $! b:bs
-          bs''  = map (subtract $! length x) (b:bs)
-          x'    = take b x
-          x''   = drop b x
+          bs''  = map (subtract $! length (tokenizer x)) (b:bs)
+          x'    = take b (tokenizer x)
+          x''   = drop b (tokenizer x)
 
   normalize :: VString -> VString
   normalize [] = []
@@ -264,15 +286,15 @@ sepSegments xs = case last xs of --last takes O(n). Use sequence which has const
   distill dim v s n = normalize $! fst $! l pv d
     where
       (o, m) = s `applySelectionWithMap` v
-      d = partitionDiff ((wordsBy (==' ') o) -?- (wordsBy (==' ') n)) $! map fst m
+      d = partitionDiff ((tokenizer o) -?- (tokenizer n)) $! map fst m
       pv = denormalizeV s v $! diffBoundaries d
 
-      (^:) :: Segment-> (VString, [Diff Char]) -> (VString, [Diff Char])
+      (^:) :: Segment-> (VString, [Diff String]) -> (VString, [Diff String])
       x ^: (y, z) = ((x:y), z)
 
-      l :: VString -> [Diff Char] -> (VString, [Diff Char])
+      l :: VString -> [Diff String] -> (VString, [Diff String])
 
-      l ( []) ((Different [] x):ds) = ( [Chc dim ( []) ( [Str x])], ds)
+      l ( []) ((Different [] x):ds) = ( [Chc dim ( []) ( [Str (concat x)])], ds)
 
       l ( []) ds = ( [], ds)
 
@@ -280,16 +302,16 @@ sepSegments xs = case last xs of --last takes O(n). Use sequence which has const
       l ( ((Str x):vs)) ((Same _):ds) = Str x ^: (l ( vs) ds)
 
       -- Addition:
-      l vs ((Different [] x):ds) = Chc dim ( []) ( [Str x]) ^: (l vs ds)
+      l vs ((Different [] x):ds) = Chc dim ( []) ( [Str (concat x)]) ^: (l vs ds)
 
       -- Removal:
       l ( ((Str x):vs)) ((Different x' []):ds) =
         Chc dim ( [Str x]) ( []) ^: (l ( vs) ds)
 
       -- Changed plain:
-      l ( ((Str x):vs)) ((Different x' y):ds) = if x == x'
-        then Chc dim ( [Str x]) ( [Str y]) ^: (l ( vs) ds)
-        else error $! concat [ "Mismatch ", show x, " /= ", show x' ]
+      l ( ((Str x):vs)) ((Different x' y):ds) = if x == (concat x')
+        then Chc dim ( [Str x]) ( [Str (concat y)]) ^: (l ( vs) ds)
+        else error $! concat [ "Mismatch ", show x, " /= ", show (concat x') ]
 
       -- Recurse downward along choice:
       l ( ((Chc dim' left right):vs)) ds = case dim' `asSelectedIn` s of
