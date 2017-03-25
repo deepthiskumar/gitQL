@@ -226,16 +226,21 @@ matchStr (Plain (C d)) pos (c:s)
                                                        (incOffset pos,vStr s)
 matchStr (Plain Wild) pos (c:s)       = SM $ StrSplit (((pos,[]),[Str[c]]),[]) 
                                                        (incOffset pos,vStr s)
-matchStr (Seq a p)    pos (c:[])      = matchStr a pos [c] `andThen` 
-  (SM (PatSplit (((startPos,[]),[]),[]) p))
-matchStr (Seq a p)    pos (c:s)       = matchStr a pos [c] `andThen` 
-  matchStr p (incOffset pos) s
+matchStr (Seq p p') pos s             = case matchStr p pos s of
+  NoMatch                              -> NoMatch
+  sp@(SM (StrSplit m (pos',[Str s']))) -> sp `andThen` matchStr p' pos' s'
+  sp@(SM (StrSplit m (pos',[]))) -> SM (PatSplit m p')
+  (SM (PatSplit m p''))          -> SM (PatSplit m (Seq p'' p'))
+  sp                             -> trace (show sp) undefined       
 matchStr (Alt p q)    pos s           = matchStr p pos s `orElse` 
   matchStr q pos s
 matchStr (PChc (_) p q) pos s         = matchStr p pos s `and'`
   matchStr q pos s
---matchStr p pos []                     = SM $ PatSplit (((pos,[]),[Str ""]),[]) p
-matchStr _          _   _             = NoMatch
+matchStr p pos s                      = NoMatch
+{-matchStr (Seq a p)    pos (c:[])      = matchStr a pos [c] `andThen` 
+  (SM (PatSplit (((startPos,[]),[]),[]) p))
+matchStr (Seq a p)    pos (c:s)       = matchStr a pos [c] `andThen` 
+  matchStr p (incOffset pos) s-}
 
 
    --next occurrence
