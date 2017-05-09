@@ -3,6 +3,7 @@ module GitQuery where
 --import VPMNewTest
 import Prelude hiding (filter)
 import VPMNew
+import VPMNewTest as T
 
 --Example 1: Find all the commits that affected a method foo
 
@@ -58,8 +59,9 @@ pretty = concatMap show
 --Combining two vgrep result
 
 oR :: Matches -> Matches -> Matches
-oR ms [] = ms
 oR [] ms = ms
+oR ms _ = ms
+
 
 aND :: Matches -> Matches -> Matches
 aND [] []  = []
@@ -86,6 +88,12 @@ listDim :: VString -> [Dim]
 listDim [] = []
 listDim (Str _ : vs) = listDim vs
 listDim (Chc d _ _ : vs) = d: listDim vs
+
+getDims :: String -> Matches -> [Dim]
+getDims x [] = []
+getDims x ((((p,d),s),q):ms) = 
+ (concatMap (\(d',dim)-> if d' == x then [dim] else [] ) d) ++
+  getDims x ms
 
 -- Sub query
 vgrepAgain :: Pattern -> [Input] -> Matches
