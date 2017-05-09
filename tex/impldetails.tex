@@ -1,0 +1,16 @@
+GQL is an embedded domain specific language implemented in Haskell. It uses the syntax and features of the host language, which is Haskell while adding the domain specific elements i.e., queries, patterns, filters and so on.
+
+To evaluate GQL, we first need variational files that consists of all changes encoded in choices.
+Version controlling a file is same as program editing but the edits are usually larger. A commit in git corresponds to an edit in the choice edit model. A commit consolidates multiple small edits into one large edit. For each commit that introduces changes in a file, choices can be added like the way it is done in the choice edit model. All the choices corresponding to a commit will have the same dimension. This way we can identify all the changes made by a specific commit. The selective undo and redo operations in the choice edit model correspond to git's revert and cherry-pick commands. Using the choice edit model, we create a variational file that contains the entire change history of the file.
+
+A part of a variational file is shown in the listing~\ref{lst:enc1}. It shows a function initially named as \texttt{contains} is renamed to \texttt{elem} and then again to \texttt{present}. $\theta$ is used to differentiate between the choice construct and the object language. The dimension names used here are integers and start from one. These dimension names also capture the temporal aspect of the commits. For example, choices with dimension name \textit{1} are introduced before the choices with dimension name \textit{2}. It also implies that the changes encoded by the choices with dimension name \textit{1} were made before the changes encoded by the choices with dimension name \textit{2}. Queries in GQL are run on the variational file and therefore we first need to generate a variational file for each file that is being version controlled. This is done as a one-time step by a separate tool. The tool starts with the first version of the file and copies the contents into the variational file as is. From the second version onwards, it computes the differences and encodes them into choices. The difference between the previous and the current version of the file is found using the longest common subsequence algorithm [Cite]. The tool iterates through all the versions in a chronological order and produces a variational file in the end.%the result of which is essentially from the change history. 
+
+\begin{lstlisting}[caption=Encoding of version history of a program file, label=lst:enc1, gobble=0, basicstyle=\ttfamily\small]
+... 
+$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ :: Eq a => a -> Tree a -> Bool 
+$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x Leaf = False 
+$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x (Node y l r) 
+  = x == y || 
+    $\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x l ||
+    $\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x r
+\end{lstlisting}

@@ -1,53 +1,168 @@
 %Introduction
 
-GQL is language to query the history of git repositories. Before going to the GQL, let us first see the need to query the history and how it is done till now is.
+%GQL is language to query the history of git repositories. Before going to the GQL, let us first see the need to query the history and how it is done till now is.
 
-\textbf{Why querying history is important}
+%\textbf{Why querying history is important}
 
 One of the advantages of using version control systems (VCS) is that the users of a software repository can look at the evolution of the software. Users can see the changes that led to newer versions. These changes help users or programmers understand the workings of the current version because they can see what changed from the previous version. In the case of software bugs, users can quickly narrow down the part of code that caused it by identifying what changed between the version that worked correctly and the current version. Hence, the history of software plays a vital role in its maintenance. 
 
 
 The history is important even during the development phase. A VCS makes it easier for the developers to try different implementations and choose one among them. This is either done by having a different implementation in a separate branch or by reverting to a previous version in the same branch in the case the latest implementation did not work. Querying even a shorter history helps the programmer to look at the changes she made and compare them.
 
-\textbf{Current commands and tools and why they are not sufficient}
+Git, which is a distributed version control system has gained immense popularity over the last decade. A 2015 survey by Stackoverflow shows that 69.3$\%$ of the developers prefer git over other version control systems. Github ~\cite{github} which is a web-based version control system that uses git, hosts over 55 million projects. Hence, we looked at the history of projects that are version controlled by git.
+
+%\textbf{Current commands and tools and why they are not sufficient}
 
 Searching for a word or a sentence in a single file is an easy task supported by many tools.% and commands available. 
 One can look for exact words or a pattern of words in which case a regular expression is used to specify the pattern. 
-%A regular expression is a sequence of characters which acts as a syntax for the matching texts. 
-
-%The language for regular expressions consists of literal characters including the empty string. Strings are obtained by concatenating multiple characters. The regular expression also consists of alternation and Kleene star as described below
-%\begin{description}
-%%\item[1]Concatenation: A string obtained by concatenating a character to a string.
-%\item[1]Alternation: R|S denotes either R or S , both of which are regular expressions, to be matched. For example, the regular expression \texttt{" "(a|an|the)" "} matches any of the articles. The space before and after is to make sure they are separate words and not substrings of other words.
-%\item[2]Kleene Star: R* denotes zero or more occurrences of the pattern R. For example, \texttt{a(b)*} matches text that starts with \texttt{a} followed by zero or more number of \texttt{b}'s.
-%\end{description} 
-%For example, the regular expression $[A-Z][a-z]*$ matches the text that starts with an upper case letter followed by zero or more lowercase letters. %%To search all the email ids in a file, the user can use the regular expression for a valid email id $[A-Z0-9._\% + -]+@ [A-Z0-9.-]+.[A-Z]\{2,\}$. Tools searching a file using this pattern will return all the email ids that match the pattern.
-Grep is a Unix tool that can search a file using regular expression. 
+Grep is one such tool in Unix that can search a file using regular expression. 
 
 
-In a file that is version controlled, searching involves looking into a specific version or all the versions of the file. To find a version that consists of a pattern, the user can create a script that runs grep on all the versions and return the ones that contain the pattern. This brute-force approach is straightforward and easy to implement. However, it is not efficient when there are a huge number of versions.
+In a file that is version controlled, searching involves looking into a specific version or all the versions of the file. To find a version that consists of a pattern, the user can create a script that runs grep on all the versions and returns	 the ones that contain the pattern. This brute-force approach is straightforward and easy to implement. However, it is not efficient when there are a huge number of versions.
 
 An alternative is to use the commands provided by the VCS itself. Since these commands directly work on the internal representation, they are faster than the brute-force approach. In the case of git, commands like {\ttf git log}, {\ttf git diff}, and {\ttf git show} along with various options can be used to query the history. Some of the options allow users to search using regular expressions.
 
-However, in cases where the users want to query the changes made to a particular part of the program, git commands do not suffice. 
-\begin{comment}
-Consider a case where the user is looking for a specific change, that is, some string \textit{s} changed to \textit{t}.
-Git consists of commands that can be used to query what was added or removed in each version. 
-Such a command would return all the versions that added \textit{s} and all the versions that removed \textit{t} instead of just the version that replaced \textit{s} with \textit{t}.  Git also has commands that can track the changes made to a range of lines in the file. However, these are not accurate sometimes since the line numbers keep changing due to addition and deletion of lines.
-Most of these commands are complex and sometimes require external scripts as well.
+However, in cases where the users want to query the changes made to a particular part of the program, git commands do not suffice.
+ 
+%\begin{comment}
+%Consider a case where the user is looking for a specific change, that is, some string \textit{s} changed to \textit{t}.
+%Git consists of commands that can be used to query what was added or removed in each version. 
+%Such a command would return all the versions that added \textit{s} and all the versions that removed \textit{t} instead of just the version that replaced \textit{s} with \textit{t}.  Git also has commands that can track the changes made to a range of lines in the file. However, these are not accurate sometimes since the line numbers keep changing due to addition and deletion of lines.
+%Most of these commands are complex and sometimes require external scripts as well.
 
-Consider a scenario where all the changes made to a function needs to be looked into for debugging purposes. A search for the function name will return all the versions that contain the function.  What we need in this case are all the versions that have some changes made to the function. Git log with the option -L searches the history of a range of lines specified by a start and an end. But this range will change when lines are added or deleted around the function, and therefore not all the changes are captured.
-\end{Comment}
+%Consider a scenario where all the changes made to a function needs to be looked into for debugging purposes. A search for the function name will return all the versions that contain the function.  What we need in this case are all the versions that have some changes made to the function. Git log with the option -L searches the history of a range of lines specified by a start and an end. But this range will change when lines are added or deleted around the function, and therefore not all the changes are captured.
+%\end{Comment}
+
+Consider a scenario where two developers, Jen and Bob are working on a program that is version controlled by git, shown in listing~\ref{lst:ex1.1}. The program involves accessing user information from the database. The \ttf{elementOf} function parses a list of users and returns true if an arbitrary user exists otherwise false. This function is used before making expensive database access to retrieve any data about a user. 
+
+\begin{lstlisting}[caption= Code snippet, label=lst:ex1.1, gobble=0, basicstyle=\ttfamily\small]
+...
+Boolean elementOf(ID userID)
+{ 
+ String userID = regexLookUp("*userID",this.userList);
+  if(userID == "")
+   return False;
+  else
+   return True;
+}
+...
+User getUserInfo(ID userID)
+{
+ User user = Null;
+ if(!elementOf(userID))
+  throw new Exception("User not present");
+ else
+  user = getUserInfoFromDB(userID);
+ return user;
+}
+...
+\end{lstlisting}
+
+Jen is working on a new feature and adds few methods to this program. Some of the new methods use \ttf{elementOf}. Listing ~\ref{lst:ex1.2} shows one of the new methods added by Jen.
+Bob on the other hand is refactoring the existing code. He changes the method name \ttf{elementOf} to \ttf{isCurrentUser}. However, Bob renames it twice before arriving at this name. First, to \ttf{contains} and then to \ttf{present}, all of them committed to the repository. Listings ~\ref{lst:scr1}, ~\ref{lst:scr2} and ~\ref{lst:scr3} show the differences in each commit that renames the \ttf{elementOf} method.
+
+\begin{lstlisting}[caption= Code snippet, label=lst:ex1.2, gobble=0, basicstyle=\ttfamily\small]
+...
+Link getUserlinks(ID userID1, ID userID2)
+{
+ User user1 = Null;
+ User user2 = Null;
+ if(!elementOf(userID1))
+  throw new Exception("User %1 not present", userID1);
+ if(!elementOf(userID2))
+  throw new Exception("User %1 not present", userID2);
+  
+ user1 = getUserInfoFromDB(userID1);
+ user2 = getUserInfoFromDB(userID2);
+ return getlinks(user1,user2);
+}
+...
+\end{lstlisting}
+
+%\begin{figure}
+%    \includegraphics[width=150mm]{scr1}
+%    \caption{Renamed to \ttf{contains}}\label{fig:scr1}
+%\end{figure}
+
+\begin{lstlisting}[caption= Renamed to \ttf{contains}, label=lst:scr1, gobble=0, basicstyle=\ttfamily\small]
+$\color{red}\texttt{-Boolean elementOf(ID userID)}$
+$\color{green}\texttt{+Boolean contains(ID userID)}$
+{
+	String userID = regexLookUp("*userID",this.userList)
+	if(userID == "")
+$\color{blue}\texttt{@@ -19,7 +19,7 @@}$ Boolean elementOf(ID userID)
+User getUserInfo(ID userID)
+{
+	User user = Null;
+$\color{red}\texttt{-	if(!elementOf(userID))}$
+$\color{green}\texttt{+	if(!contains(userID))}$
+		throw new Exception("User not present");
+\end{lstlisting}
+
+\begin{lstlisting}[caption= Renamed to \ttf{present}, label=lst:scr2, gobble=0, basicstyle=\ttfamily\small]
+$\color{red}\texttt{-Boolean contains(ID userID)}$
+$\color{green}\texttt{+Boolean present(ID userID)}$
+{
+	String userID = regexLookUp("*userID",this.userList)
+	if(userID == "")
+$\color{blue}\texttt{@@ -19,7 +19,7 @@}$ Boolean elementOf(ID userID)
+User getUserInfo(ID userID)
+{
+	User user = Null;
+$\color{red}\texttt{-	if(!contains(userID))}$
+$\color{green}\texttt{+	if(!present(userID))}$
+		throw new Exception("User not present");
+\end{lstlisting}
+
+\begin{lstlisting}[caption= Renamed to \ttf{isCurrentUser}, label=lst:scr3, gobble=0, basicstyle=\ttfamily\small]
+$\color{red}\texttt{-Boolean present(ID userID)}$
+$\color{green}\texttt{+Boolean isCurrentUser(ID userID)}$
+{
+	String userID = regexLookUp("*userID",this.userList)
+	if(userID == "")
+$\color{blue}\texttt{@@ -19,7 +19,7 @@}$ Boolean elementOf(ID userID)
+User getUserInfo(ID userID)
+{
+	User user = Null;
+$\color{red}\texttt{-	if(!present(userID))}$
+$\color{green}\texttt{+	if(!isCurrentUser(userID))}$
+		throw new Exception("User not present");
+\end{lstlisting}
+
+%\begin{figure}
+%    \includegraphics[width=150mm]{scr2}
+%    \caption{Renamed to \ttf{present}}\label{fig:scr2}
+%\end{figure}
+%\begin{figure}
+%    \includegraphics[width=150mm]{scr3}%[width=\columnwidth]{scr3}
+%    \caption{Renamed to \ttf{isCurrentUser}}\label{fig:scr3}
+%\end{figure}
+
+Both Jen and Bob are working on different branches. First, Bob merges his changes with the main branch. After Jen merges her changes, she finds out that the program does not compile successfully. The method \ttf{elementOf} no longer exists. There are three ways to identify the problem.
+\begin{description}
+\item[1] Look for the file that contained \ttf{elementOf} and then search through the file that has the same implementation as \ttf{elementOf}.
+\item[2] Go through all the commits, made after Jen created the branch, one by one.
+\item[3] Search for the commit that renamed the method using the command \ttf{git log -G`elementOf'}. 
+\end{description}
+
+Option 1 and 2 are quite tedious if the implementation is complex or if the number of commits are large, respectively. The command in option 3 returns the commits that has \ttf{elementOf} in the added or removed lines. It shows even the commit that added the function for the first time. By going through the commits returned by the command, Jen sees that it was renamed to \ttf{contains}. However, that is not the latest name of the method. Jen has to then search again using \ttf{git log -G`contains'} to know what \ttf{contains} was renamed to and so on until the latest name is known. This comparatively takes less time than the other two options but nonetheless, is tedious.
+
 Hence there is a need for a language that is simple, and that enables users not just to look for patterns but also to look for changes in the history of software repositories.
 
-\textbf{Prominent feature of GQL: Choice Patterns. Illustrated with an example}
+%\textbf{Prominent feature of GQL: Choice Patterns. Illustrated with an example}
 
 In GQL, users can query the history similar to grep by using regular expressions.
-An important feature is, however, to query specific changes. This can be achieved using the ``Choice Patterns."  In a choice pattern, users can specify a pattern for the text in the previous version and another pattern for the text in the later version. Therefore, retrieving only the versions that made such changes. 
+The important feature, however, is to query specific changes. This can be achieved using the ``Choice Patterns."  In a choice pattern, users can specify a pattern for the text in the previous version and another pattern for the text in the later version. Therefore, retrieving only the versions that made such changes. The user can also specify the text in one version and obtain the subsequent changes made to it.
 
+In the above example scenario, in GQL, Jen would query using the choice pattern \chc[d]{\ttf{elementOf},\ttf{\$x}} and obtain all the subsequent changes made to \ttf{elementOf}. The changes will be bound to the variable \ttf{x}. Choice patterns are explained in detail in section \ref{sec:gitql}.
+
+\mytodo{specify the structure of rest of the paper}
+
+
+\begin{comment}
 For example, consider a C program shown in the listing~\ref{lst:v1}. The program consists of two functions along with the other functions; \texttt{get_record} returns a record value from a string in a particular format specified by the global variable \texttt{format}, \texttt{show_record} returns a string in the same format from a record value.
 
-% the pattern to find the version in which a function \textit{foo} was renamed to \textit{bar} is \textit{\chc {foo,bar}}. The syntax for choice pattern is {\chc {\textit{Pattern-before}, \textit{Pattern-after}}}. The character {\dimMeta} is called the dimension which is explained in further sections.
+ the pattern to find the version in which a function \textit{foo} was renamed to \textit{bar} is \textit{\chc {foo,bar}}. The syntax for choice pattern is {\chc {\textit{Pattern-before}, \textit{Pattern-after}}}. The character {\dimMeta} is called the dimension which is explained in further sections.
 
 \begin{lstlisting}[caption= C program that formats a record, label=lst:v1, gobble=0, basicstyle=\ttfamily\small]
 #include <formatrecord.h>
@@ -98,6 +213,8 @@ char* show_record(Struct Record r)
 \end{lstlisting}
 
 Now, the function \texttt{get_record} uses \texttt{current_format} whereas the function \texttt{show_record} uses \texttt{default_format}. 
+
+
 %The merged program in shown in the listing ~\ref{lst:v4}.
 
 %\begin{lstlisting}[caption= The same C program modified in branch 2 , label=lst:v4, gobble=0, basicstyle=\ttfamily\small]
@@ -119,195 +236,13 @@ Now, the function \texttt{get_record} uses \texttt{current_format} whereas the f
 
 The program now reads the string in the appropriate format but writes in the old format. The programmer who coded the initial version knows only about the variable \texttt{format}. But the current code has two different variable names and so the programmer now, to understand the changes, wants to view all the changes that were made to the variable. With current git commands, the programmer has to first identify the commit that changed the variable name from \texttt{format} and then look for the commit that changed \texttt{default_format}. In GQL, this can be easily queried using the choice pattern \chc[d]{\texttt{format},\texttt{\$x}}. \texttt{\$x} contains all the new names of \texttt{format}. \texttt{\$x} is a query variable and is explained in the later section.
 
+\end{comment}
+
 %In the case where only one of the patterns is known, the other can simply be a variable which then refers to the entire text that was changed to or from. The texts stored in these variables can simply be displayed or queried further.
 
-\textbf{The Choice calculus}
-
-[Cite paper, Eric's Ph.D. thesis, GTTSE tutorial]
-To achieve this feature, we represent the history of a repository using a formal language for variation called the choice calculus [Cite]. The choice calculus is a generic language that can be applied to an arbitrary object language. The choice calculus consists of \textit{choices} to denote variations. The syntax of a choice is {\chc {A,B,..}} where \textit{A},\textit{B} and so on are called the alternatives. The alternatives could be terms in the object language or choices themselves. Each of the alternatives in a choice leads to a different version. Therefore, a choice represents all possible variations of an expression in the object language from which one can be selected. Using the choice calculus representation, we get a simple tree model that allows to focus on the changes that lead to newer versions.
-
-Consider the example of two different implementations of a function \texttt{twice} in C.
-
-\begin{lstlisting}
-	int twice(int x){ return x+x}
-        
-	int twice(int x){ return 2*x}
-\end{lstlisting}
-        
-We can capture the variation between the two implementations of the function \texttt{twice} in the choice expression.
-
-\begin{lstlisting}
-	int twice(int x){ $\chc{\texttt{x+x},\texttt{2*x}}$}
-\end{lstlisting}
-
-Here, both the alternatives of the choice are terms in the object language, in this case, C.
-A choice is bound to a dimension \textit{D}. Two choices can have same or different dimension names. To understand this better, in the above example, consider another implementation where the variable is named as \texttt{y}. Therefore, we now have one additional implementation of the function \texttt{twice}.
-
-\begin{lstlisting}
-	int twice(int y){ return y+y}
-        
-	int twice(int y){ return 2*y}
-\end{lstlisting}        
-	%int twice(int z){ return z+z}
-        
-	%int twice(int z){ return z*z}
-        
-The choice expression now has two dimensions, representing a variation in the variable name and function body respectively.%, therefore, capturing the fact that these are variations in two different aspects.
-
-\begin{lstlisting}  
-	int twice(int $\chc[B]{\texttt{x},\texttt{y}}$){ return $\chc[A]{\chc[B]{\texttt{x},\texttt{y}}\texttt{+}\chc[B]{\texttt{x},\texttt{y}},\texttt{2*}\chc[B]{\texttt{x},\texttt{y}}}$ 
-\end{lstlisting}
 
 
-Two choices with dimension name \textit{B} are nested in the choice with dimension name \textit{A} thereby representing variations in multiple levels. This way, all the variants of a program in the object language can be represented using the choice calculus in one variational program.
 
-From a variational program consisting of choices, a concrete program variant can be obtained by recursively selecting an alternative from each choice until all the choices are eliminated. The process of selecting an alternative from a choice is called \textit{selection}. A selection is a mapping from a dimension name to an alternative. The set of selections required to obtain a concrete program is called a \textit{decision}.
-
-From the choice expression in the above example, to obtain the variant of \texttt{twice} which has \texttt{y} as the variable and implemented using \texttt{+}, we have to make two selections; one for the choice of variable names and the other for the choice of the function body. A selection is denoted by \textit{D}.L, \textit{D}.R where \textit{D} is the dimension name and L,R being abbreviation for `Left' and `Right' denotes the first and the second alternatives respectively.%1,2,..n are the indexes of the n alternatives that occur in the same order. 
-The decision \{\textit{A}.L, \textit{B}.R\} will select the left alternative from the choice with dimension name \textit{A} and the right alternative from the choices with dimension name \textit{B} and produce the following concrete program in the object language.
-
-\begin{lstlisting}
-	int twice(int y){return y+y}
-\end{lstlisting}
-        
-Here \textit{B}.R selects the second alternative from all the three choices that are named \textit{B}. The dimension names, therefore, synchronize the changes that are made in different places but are all part of the same variation. 
-
-\textbf{The Choice Edit Model}
-To represent the version history of a file using the choice calculus representation, we use the choice edit model[Cite] which is an application of the choice calculus representation. The choice edit model is a program edit model that can be used to understand and reason about the edits that a developer makes while editing a program. In the choice edit model, making an edit to a program is viewed as introducing variation into the program. Whenever a program part \textit{P} is changed to \textit{Q}, a choice between \textit{P} and \textit{Q} is introduced. Here, in a choice, the left alternative consists of the old value and the right alternative consists of the new value. %Consequently, selection can be expressed as \textit{D}.L and \textit{D}.R for left and right alternatives respectively. 
-The object language, in this case, is simply a string of characters because we are capturing the textual edits and do not care if the program behavior changes or not.
-
-Consider a C program \textit{P} which consists of a function \texttt{f}. This is the first version of the program. %No changes have been made to it and therefore the variational program \textit{VP} is same as \textit{P}.
-
-\begin{lstlisting} 
-P = int f(int a)
-    {int b; return a+b;}
-\end{lstlisting}    
-%VP = int f(int a)
-%     {int b; return a+b;}
-
-
-A programmer makes the following sequence of edits on \texttt{f}. After each edit, choices are added in the variational program VP.
-
-\textbf{Edit 1:} Change the function argument to \texttt{c}. in the variation program \texttt{VP1}, a choice with dimension name, say \textit{A}, between \texttt{a} and \texttt{c} is introduced in all the places where the edit is made.
-
-\begin{lstlisting}
-P1 = int f(int c)
-    {int b; return c+b;}
-    
-VP1 = int f(int $\chc[A]{\texttt{a},\texttt{c}}$)
-     {int b; return $\chc[A]{\texttt{a},\texttt{c}}$+b;}
-\end{lstlisting}
-
-\textbf{Edit 2:} Assign the value 1 to the variable \texttt{b}. A choice with a different dimension name, say \textit{B}, between an empty string and ``\texttt{=1}" is introduced. This edit is an insert operation and therefore there is no old value. Similarly, for a delete operation there is no new value and therefore, the choice that represents a delete operation will have an empty string in the right alternative.
-
-\begin{lstlisting}
-P2 = int f(int c)
-    {int b=1; return c+b;}
-    
-VP2 = int f(int $\chc[A]{\texttt{a},\texttt{c}}$)
-     {int b$\chc[B]{,\texttt{=1}}$; return $\chc[A]{\texttt{a},\texttt{c}}$+b;}
-\end{lstlisting}
-
-\textbf{Edit 3:} Change the function argument again to \texttt{d}. A new choice with dimension name, say \textit{C}, is introduced. This edit is changing the string that has already been changed previously and therefore is nested in the right alternative of the choice with dimension name \textit{A}\\
-. Such edits are called chain edits.
-
-\begin{lstlisting}
-P3 = int f(int d)
-    {int b = 1; return d+b;}
-    
-VP3 = int f(int $\chc[A]{\texttt{a},\chc[C]{\texttt{c},\texttt{d}}}$)
-     {int b$\chc[B]{,\texttt{=1}}$; return $\chc[A]{\texttt{a},\chc[C]{\texttt{c},\texttt{d}}}$+b;}
-\end{lstlisting}
-
-For each edit operation, a new choice is introduced. To synchronize the edits made in different places, the choices are given the same dimension name. The variational program \texttt{VP3} now consists of the information on how the program was edited. It consists of all the edit operations that were made to the initial program P. The latest version can be obtained by selecting the right alternative from all the choices in \texttt{VP3}. The programmer can select any variant by making appropriate selections. For example, the decision \{\textit{A}.R,\textit{B}.L,\textit{C}.R\} will generate a variant that consists of Edit 1 and Edit 3 but not Edit 2 which, in terms of text editing, is called a selective undo. A selective undo feature allows the user to selectively choose which edits made to the program need to undone, instead of linearly undoing all the changes that were made one after the other. Similarly, a selective redo operation allows user to choose the edits that she wants to make again without having to linearly do all the edits. The program variant obtained after applying the decision \{\textit{A}.R,\textit{B}.L,\textit{C}.R\} is
-
-\begin{lstlisting}
-int f(int d)
-{int b; return d+b;}
-\end{lstlisting}
-
-\textbf{CC in Version control}
-
-Version controlling a file is same as program editing but the edits are usually larger. A commit in git corresponds to an edit in the choice edit model. A commit consolidates multiple small edits into one large edit. For each commit that introduces changes in a file, choices can be added like the way it is done in the choice edit model. All the choices corresponding to a commit will have the same dimension. This way we can identify all the changes made by a specific commit. The selective undo and redo operations in the choice edit model correspond to git's revert and cherry-pick commands. Using the choice edit model, we create a variational file that contains the entire change history of the file.
-
-A part of a variational file is shown in the listing~\ref{lst:enc1}. It shows a function initially named as \texttt{contains} is renamed to \texttt{elem} and then again to \texttt{present}. $\theta$ is used to differentiate between the choice construct and the object language. The dimension names used here are integers and start from one. These dimension names also capture the temporal aspect of the commits. For example, choices with dimension name \textit{1} are introduced before the choices with dimension name \textit{2}. It also implies that the changes encoded by the choices with dimension name \textit{1} were made before the changes encoded by the choices with dimension name \textit{2}. Queries in GQL are run on the variational file and therefore we first need to generate a variational file for each file that is being version controlled. This is done as a one-time step by a separate tool. The tool starts with the first version of the file and copies the contents into the variational file as is. From the second version onwards, it computes the differences and encodes them into choices. The difference between the previous and the current version of the file is found using the longest common subsequence algorithm [Cite]. The tool iterates through all the versions in a chronological order and produces a variational file in the end.%the result of which is essentially from the change history. 
-
-\begin{lstlisting}[caption=Encoding of version history of a C program file, label=lst:enc1, gobble=0, basicstyle=\ttfamily\small]
-... 
-$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ :: Eq a => a -> Tree a -> Bool 
-$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x Leaf = False 
-$\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x (Node y l r) 
-  = x == y || 
-    $\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x l ||
-    $\theta1\langle$contains$\theta$,$\theta2\langle$elem$\theta$,present$\theta\rangle$$\theta\rangle$ x r
-\end{lstlisting}
-
-\textbf{All the features of GQL}
-
-GQL provides various constructs that can be used by the programmer to query the history. The most important and the one which forms the crux of the language is the \texttt{vgrep} construct. The variational grep or \texttt{vgrep} takes a pattern and a variational file, looks for the pattern in it and returns all the occurrences of the pattern. The result of the query is also variational and stores the necessary context information. The syntax of \texttt{vgrep} is.
-
-\begin{lstlisting}
-vgrep <pattern> <variational_file>
-\end{lstlisting}
-
-The patterns in GQL extends the basic regular expression language to include the choice patterns. The syntax of a pattern is
-
-%\begin{lstlisting}
-%$\textit{<pattern>} ::= $\textit{<character>}  
-%            | $\textit{<anyCharacter>}
-%            | $\textit{<pattern> <pattern>}
-%            | $\textit{<pattern> | <pattern>}
-%            | $\textit{<dimension> \langle <pattern> , <pattern> \rangle}
-%            | $\textit{\textdollar <string>}
-%            | $\textit{( <pattern> )}
-%character    ::= $\textit{<ascii_character_set>}
-%anyCharacter ::= .
-%dimension    ::= $\textit{Integer | string}
-%string       ::= character string | $\epsilon$
-
-%\end{lstlisting}
-\setlength{\grammarindent}{5em} % increase separation between LHS/RHS 
-\begin{grammar} 
-
-<pattern> ::= <character>  
-            \alt <anyCharacter>
-            \alt <pattern> <pattern>
-            \alt <pattern> `|' <pattern>
-            \alt <dimension> `<' <pattern> `,' <pattern> `>'
-            \alt \textdollar <string>
-            \alt `(' <pattern> `)'
-
-<character>    ::= <ascii_character_set>
-
-<anyCharacter> ::= .
-
-<dimension>    ::= <integer> \alt <string> \alt $\epsilon$
-
-\end{grammar}
-
-
-A character in a pattern can include any ASCII character. However, since certain symbols are used to denote other patterns, these symbols, called metacharacters, need to be escaped using a backslash in order to search them. Otherwise, they will be treated as metacharacters. %For example, the metacharacter dot (.) is used to specify any character. So, if a user is looking for a pattern that consists of a full stop, then $\backslash$. should be specified in the pattern. This way the search algorithm can correctly interpret the intended use of such symbols.
-
-A sequence of patterns can be formed by concatenating one pattern with the other. This way, the user could search for a string ``\texttt{ab}" or a string followed by a choice pattern ``\texttt{int \chc[1]{\texttt{foo},\texttt{bar}}}" and so on.
-
-A choice pattern, as explained previously can be used to specify the changes. The dimension in a choice pattern can be an integer or a choice variable. In the case of an integer, \texttt{vgrep} looks for a choice with the exact dimension name. This corresponds to searching for the change made by a particular commit. For example, the pattern \chc[1]{\texttt{foo},\texttt{bar}} matches \chc[1]{\texttt{foo},\texttt{bar}} in the variational file but not \chc[2]{\texttt{foo},\texttt{bar}} since the dimension name differs. If a dimension variable is used, then \texttt{vgrep} only searches for choices based on the patterns. If both the patterns match, then the dimension variable is bound to the dimension name of the matched choice. For example, the pattern \chc[d]{\texttt{foo},\texttt{bar}} matches both \chc[1]{\texttt{foo},\texttt{bar}} and \chc[2]{\texttt{foo},\texttt{bar}} where \textit{d} is bound to 1 and 2 respectively. Dimension variables are useful when the dimension name is unknown or when a pattern could occur in multiple versions. Each match returned by \texttt{vgrep} will have the value to which the dimension variable is bound.
-%{\mytodo {Should we specify commit id instead of dimension name?}}
-
-The choice pattern and the alternation pattern are similar in that, both can be used to specify two different patterns. But there is a principle difference between them. Consider, for example, the pattern \texttt{foo|bar}. It matches the choice \chc[1]{\texttt{foo},\texttt{bar}} twice; first with \texttt{foo} and the second time with \texttt{bar}. The semantics of the alternation pattern do not consider the position of the matches which means that either of the two patterns could occur first. Therefore the pattern \texttt{foo|bar} also matches \chc[1]{\texttt{bar},\texttt{foo}}. But the semantics of querying the change \chc[1]{\texttt{foo},\texttt{bar}} is different from that of \chc[1]{\texttt{bar},\texttt{foo}}. In the former choice, it means \texttt{foo} is replaced by \texttt{bar} and in the latter, it means \texttt{bar} is replaced by \texttt{foo}. The choice pattern captures this semantics and produces intended results.
-
-Query variables in a pattern can be used to refer to a part of the query result. This is specifically for choice patterns when the user only knows the pattern for either the old value or the new value in the variational file but wants the change history of that value. By specifying query variables in the right or left alternative of the choice pattern, the user gets the new value or the old value respectively. For example, in the pattern \chc[d]{\texttt{foo},\texttt{\$q1}}, the query variable \texttt{\$q1} is bound to all changes made to the text \texttt{foo} in the variational file since the chain edits are encoded in the right alternative of the choice. These values, to which the query variables are bound, can be simply viewed or further queried.
-
-Apart from \texttt{vgrep}, GQL provides the following constructs.
-\begin{description}
-\item \texttt{count} :: To count the number of matches returned by a query.
-\item \texttt{countDim} :: To count the number of dimensions that matched. This is used in the case of choice patterns that uses dimension variables. It essentially counts the number of versions in which a match was found.
-\item \texttt{show} :: Pretty print the result of a query.
-\item \texttt{oR} :: Takes two \texttt{vgrep} results and return either of the successful matches
-\item \texttt{anD} :: Takes two \texttt{vgrep} results and returns them only if both have successful matches.
-\item \texttt{filter} :: Takes a predicate based on which it filters out the matches. %Filter the latest matches only
-\item \texttt{subQuery} :: Takes a pattern and a list of matches which were obtained from other queries and looks for the pattern in those matches. This construct allows the user to essentially nest GQL queries
-\end{description}
-[TODO : add concrete syntax for the above list of constructs]
 %A change in a file that leads to a new version can be viewed as a variation of the original file. Each edit made sequentially will create a new variant. At any point in time, any of these variants can be used. In git, this corresponds to cherry picking or reverting to a particular version. 
 %A variational file consists of all the variations encoded in constructs called ``choices". The variational file of a file that is version controlled is created by adding choices for every change that leads to a new version. 
 %[Explain Dimensions, alternatives, selections, decision]
@@ -322,7 +257,3 @@ Software development involves a lot of variations. From changes in the specifica
     Git also provides commands that can be used to query using regular expression patterns. Therefore, we compared the performance of our language against the git commands and a simple script that runs grep command on all the versions of the file. Git commands work directly on its internal representation of the commit and therefore performs slightly faster. On the other hand, \gql performs better than the brute force of approach implemented in the script.
 %The remainder of this paper has section 2 giving background on the choice calculus that is used to represent the change history of a file, Section 3 motivating our work with two example queries.
 \end{comment}
-
-\begin{lstlisting}
-
-\end{lstlisting}

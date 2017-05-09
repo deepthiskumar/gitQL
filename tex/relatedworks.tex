@@ -1,0 +1,7 @@
+%There are various tools that aim at querying the history of software repositories. But they do not capture the context to easily identify the changes and query those changes.
+
+While git's command structure to query the code is limited, it does not provide the users to query for strings in all the versions of a file let alone support finding specific changes in the history of a file.
+
+There are general purpose tools that exist, (i.e., SCQL and V-Praxis) that do not feature a language dedicated to specifying patterns or temporal aspects of the code changes. There are query languages that allow searching for code changes based on the syntax of specific languages. [QWALKEKO] is an Eclipse plugin that can be used to query the history of Java repositories version controlled in git. It uses AST nodes to identify changes and therefore is only applicable for software repositories. [Boa] is an again a query language for querying the history of Java repositories. It can be used to obtain high-level information over many repositories.
+
+There are a plethora of tools that mine software repositories. These tools again, focus on extracting high-level information about the evolution of software repositories such as design patterns, impact analysis, developer efforts and so on. They do not provide language to query fine-grained software changes.

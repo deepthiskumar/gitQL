@@ -1,0 +1,12 @@
+We evaluate our work based on the expressiveness of the language and efficiency of the variational pattern matching algorithm.
+
+To evaluate the efficiency, we compare the time taken by GQL queries against the git commands. Git currently does not have a command that would search for specific changes similar to the choice patterns, hence queries with the choice patterns are timed to show that it is more or less equal to the time taken by other queries.
+
+The corpus consists of 40 trending GitHub repositories that have the number of commits ranging from 30 to 10,000. Since the pattern matching is currently file based, from each repository, we selected a file that has the maximum number of commits. These files range from complex program files of different languages like C, Java, XML, JSON to simple readme text documents.
+
+For each of the selected files from the repositories, a .v file is created. 
+
+{\mytodo {Tabulate the repositories}}
+\mytodo {Queries that need to be run}
+\mytodo {Tabulate the timing difference}
+\mytodo {analyze the results}
