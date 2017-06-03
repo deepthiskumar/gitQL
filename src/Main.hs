@@ -110,6 +110,12 @@ getPattern 33 = p33
 getPattern 34 = p34
 getPattern 35 = p35
 getPattern 36 = p36
+getPattern 37 = p37
+getPattern 38 = p38
+getPattern 39 = p39
+getPattern 40 = p40
+getPattern 41 = p41
+getPattern 42 = p42
 getPattern _ = undefined
 
 --repo1
@@ -169,4 +175,15 @@ p20 = PChcStar (DVar "d") (None) (seqM "github.com")
 p34 = PChcStar (DVar "d") None (seqM "libgit2") --old
 p35 = seqM "coding style" --mid
 p36 = PChcStar (DVar "d") (QVar "x") (seqM "wiki")
+
+--test QueryExamples
+p37 = seqM "getCurrentDesignation"
+p38 = PChcStar (DVar "d") (seqM "getdesignation()") (seqM "getCurrentDesignation()")
+p39 = PChcStar (D 2) (None) (PChc (DVar "d") (seqM "curr") (seqM "currDesig") )
+p40 = PChcStar (DVar "d") None (seqM "setSalary")
+p41 = PChcStar (D 2) (QVar "x") (QVar "y")
+p42 = PChcStar (D 2) (QVar "x") (PChc (DVar "d") (QVar "y") (QVar "z")) -- get all the changes made to setSalary
+
+-- for nested queries, combine p40 and p41, P40 and p42
+
 

@@ -334,7 +334,7 @@ rqv' = PChcStar (DVar "d") (QVar "x") (ch 'b')
 -- >>> vgrep d0 [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
 -- [(((P 0 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1)]),[Chc 2 [] [Chc 1 [Str "a"] [Str "b"]]]),[])]
 -- >>>vgrep d2 [Chc 1 [Str "b"] [Str "c"],Str "a"]
--- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[]),[Chc 1 [Str "b"] [Str "c"],Str "a"]),[])]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "b"] [Str "c"],Str "a"]),[])]
 
 -- 
 -- |nested Matches
@@ -448,7 +448,7 @@ rqv' = PChcStar (DVar "d") (QVar "x") (ch 'b')
 -- >>> vgrep d0' [Chc 2 [Str "x"] [Chc 1 [Str "a"] [Str "b"]]]
 -- [(((P 0 (Right (NoPos,P 0 (Right (P 0 (Left 0),P 0 (Left 0))))),[("d",1)]),[Chc 2 [] [Chc 1 [Str "a"] [Str "b"]]]),[])]
 -- >>>vgrep d2' [Chc 1 [Str "b"] [Str "c"],Str "a"]
--- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[]),[Chc 1 [Str "b"] [Str "c"],Str "a"]),[])]
+-- [(((P 0 (Right (P 0 (Left 0),P 0 (Left 0))),[("d",1)]),[Chc 1 [Str "b"] [Str "c"],Str "a"]),[])]
 
 -- 
 -- |nested Matches
