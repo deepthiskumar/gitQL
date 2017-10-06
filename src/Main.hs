@@ -8,14 +8,23 @@ import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import Control.Exception as Exc
 import Data.List (nub)
+import GitParser
+import GitQuery
+
+type Env = [(Var, Result)]
+
+data Result = VRes [(Input)]
+            | DRes [Dim]
+            | ERes String
+            deriving(Show)
 
 resultFile :: FilePath
 resultFile = "/home/eecs/Documents/Papers/gitql/GQLPaper/src/res.txt"
 
-run :: Pattern -> FilePath -> IO ()
+run :: Pattern -> FilePath -> IO Matches
 run pattern vFile = do 
      v <- parseText vFile
-     writeFile resultFile (showMatch $ vgrep pattern v)
+     return $ vgrep pattern v
      
 runShow :: Pattern -> FilePath -> IO ()
 runShow pattern vFile = do 
@@ -43,11 +52,89 @@ parseText vFile= do
      --Exc.catch ( writeFile (vFile++"_V") (show vstring)) writeHandler
      return vstring
 
+
 main = do
   args <- getArgs
-  let i = read (head args) ::Int
+  let ast = parseString (head args)
+  runQuery ast
+
+main2 :: String -> IO ()
+main2 query = do
+  let ast = parseString query
+  env <- runQuery ast
+  print ast
+  print env
+  
+  {-let i = read (head args) ::Int
   let file = (head.tail) args
-  runShow (getPattern i) file
+  runShow (getPattern i) file-}
+  
+runQuery :: Query -> IO Env
+runQuery (Query vs ms) = do
+  env <- mapVgrep ms []
+  return $ lookupMany vs env -- lookupMany :: vs, env -> Result
+  
+mapVgrep :: Search -> Env -> IO Env
+mapVgrep [] env = return env
+mapVgrep (m:ms) env = do
+  b <- runVgrep m env
+  mapVgrep ms (b++env)
+  
+runVgrep :: MatchGen -> Env -> IO Env
+runVgrep (MatchGen v p (FName filename) c) e = do
+  m <- run p filename
+  return $ ((v,(VRes $ map getMatch m)):e) ++ allQVar m []  --TODO add all the query variable bindings from m
+runVgrep (MatchGen v p (VBinding var) c) env = do
+  let vs = lookupVar var env -- v::[input]
+  return ((v,VRes $ map getMatch (vgrepAgain p vs)):env) 
+runVgrep (MatchGen v p (Q q@(Query vs ms ) ) c) env      = do
+  env' <- runQuery q
+  return ((v,VRes $ map getMatch (vgrepAgain p (getVStringFromEnv $ lookupMany vs env'))):env)
+  
+lookupMany :: [Var] -> Env -> Env
+lookupMany [] env = []
+lookupMany (v:vs) env = case lookup v env of
+  Just res -> (v,res) : lookupMany vs env
+  Nothing  -> (v, ERes $ v++" not found") : lookupMany vs env
+
+
+lookupVar :: Var -> Env -> [Input]
+lookupVar v env = case lookup v env of
+  Just res -> getInputFromRes res
+  Nothing  -> error $ v++" not found"
+  
+getInputFromRes :: Result -> [Input]
+getInputFromRes (ERes s)     = error s
+getInputFromRes (VRes m)     = m
+getInputFromRes (DRes dims)  = error $ "Cannot use commit meta-info as source" 
+ 
+
+allQVar ::  Matches -> Env -> Env
+allQVar [] env                = env
+allQVar ((_,[]):ms) env       = allQVar ms env
+allQVar ((s,(q,m):qs):ms) env = let env' = merge (q,m) env
+ in allQVar ((s,qs):ms) env'
+
+ 
+merge :: (String, VMatch) -> Env -> Env
+merge (q,m) [] = [(q, VRes [vString m])]
+merge (q,m) (e@(v,VRes vs):env) 
+  | q == v    = (q,VRes (vString m : vs) ) :env
+  | otherwise = e : merge (q,m) env
+merge (q,m) (e@(v,vs):env) 
+  | q == v    = (q, ERes $ q ++" is already used to store variational string") : env
+  | otherwise = e : merge (q,m) env
+
+getVStringFromEnv :: Env -> [Input]
+getVStringFromEnv []           = []
+getVStringFromEnv ((v,res):es) = getInputFromRes res ++ getVStringFromEnv es 
+  
+--todo
+--check what all is pending
+--env should will have all the values, how to identify selected values in nested queries?
+  
+--lookup
+   
     
 stripNewline :: [Char] -> [Char]
 stripNewline []                 = []

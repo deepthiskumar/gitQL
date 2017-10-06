@@ -17,6 +17,7 @@ data Pattern = Plain Atomic
              --Ex. `a*` => `Repeat (ch 'a') 0 None`
              | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
              | QVar QVarName
+             | Any
              deriving(Show,Eq)
              
 type DimVarName = String
