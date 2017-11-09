@@ -10,7 +10,12 @@ import Control.Exception as Exc
 import Data.List (nub)
 import GitParser
 import GitQuery
+import Pretty
 
+{- TODO
+1. implement _
+2.map dimension to commit ID (Should the dimension be changed to 7char hash instead of int?) 
+-}
 type Env = [(Var, Result)]
 
 data Result = VRes [(Input)]
@@ -21,9 +26,28 @@ data Result = VRes [(Input)]
 resultFile :: FilePath
 resultFile = "/home/eecs/Documents/Papers/gitql/GQLPaper/src/res.txt"
 
+-- TODO Refine Pretty Match
+prettyMatch :: Env -> String
+prettyMatch []           = ""
+prettyMatch ((v,res):xs) = case res of
+   VRes inp  -> v++" : "++ showInp inp
+   DRes dims -> v++" : "++ (show dims)
+   ERes e    -> "Error: "++e 
+   
+prettyVString :: VString -> String
+prettyVString = concatMap prettySegment
+
+prettySegment :: Segment -> String
+prettySegment (Str t)     = t
+prettySegment (Chc d v v') = showChc d (map prettyVString [v,v'])
+
+showInp :: [Input] -> String
+showInp [] = ""
+showInp ((pos,v):res) = (prettyVString v ++ " \n") ++ showInp res
+
 run :: Pattern -> FilePath -> IO Matches
 run pattern vFile = do 
-     v <- parseText vFile
+     v <- parseText (vFile++".v")
      return $ vgrep pattern v
      
 runShow :: Pattern -> FilePath -> IO ()
@@ -52,11 +76,15 @@ parseText vFile= do
      --Exc.catch ( writeFile (vFile++"_V") (show vstring)) writeHandler
      return vstring
 
+res = runQuery (Query ["x"] [MatchGen "m" (PChcStar (DVar "d") (Seq (Plain (C 'e')) (Seq (Plain (C 'l')) (Seq (Plain (C 'e')) (Seq (Plain (C 'm')) (Seq (Plain (C 'e')) (Seq (Plain (C 'n')) (Seq (Plain (C 't')) (Seq (Plain (C 'O')) (Plain (C 'f')))))))))) (QVar "x")) (FName "/home/eecs/Documents/gitRepos/testEncoding/repo1/test1.java") Nothing])
 
 main = do
   args <- getArgs
   let ast = parseString (head args)
-  runQuery ast
+  env <- runQuery ast
+  --print ast
+  newEnv <- res
+  putStr $ prettyMatch newEnv
 
 main2 :: String -> IO ()
 main2 query = do

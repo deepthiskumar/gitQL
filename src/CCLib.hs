@@ -191,9 +191,9 @@ module CCLib where
       a :: Path -> Int -> VString -> (Text, VMap)
       a _ _ [] = ([], [])
       a p o ((Str b):vs) =
-        (b, (o, reverse p)) ^: a (psucc p) (o + length b) (vs)
+        (b, (o, reverse p)) ^: a (psucc p) (o + length (tokenizer b)) (vs)
       a p o ((Chc d l r):vs) =
-        a' ^++ a (psucc p) (o + length v')(vs)
+        a' ^++ a (psucc p) (o + length (tokenizer v'))(vs)
         where
           c = case d `asSelectedIn` s of { L -> l; R -> r }
           a'@(v', _) = a (0:p) o c

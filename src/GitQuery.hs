@@ -4,6 +4,7 @@ module GitQuery where
 import Prelude hiding (filter)
 import VPMNew
 import VPMNewTest as T
+import Types
 
 --Example 1: Find all the commits that affected a method foo
 

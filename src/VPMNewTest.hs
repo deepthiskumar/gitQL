@@ -2,9 +2,15 @@ module VPMNewTest where
 
 import Prelude hiding (seq)
 import VPMNew
+import Types
+import Data.Text as T (Text, pack)
 
 -- patterns
 --
+
+p :: String -> Text
+p = T.pack
+
 ch :: Char -> Pattern
 ch = Plain . C
 
@@ -38,11 +44,11 @@ a'b = Alt a b
 
 -- Strings
 --
-v = [Str "xabyabcz"]
-vc = [Chc 1 [Str "ab"] [Str "cd"],Chc 2 [Str "ef"] [Str "gh"]]
-vc1 = [Chc 1 [Str "mabn"] [Str "xca"], Str "c"]
-multipleAs =  [ Str "x",  Chc 1 ( [Str "aca"] ) ([Str "c"] )]
-share =  [ Str "c",  Chc 1 ( [Str "aba"] ) ([Str  "c"] ), Str "a"]
+v = [Str $ p "xabyabcz"]
+vc = [Chc 1 [Str $ p "ab"] [Str $ p "cd"],Chc 2 [Str $ p "ef"] [Str $ p "gh"]]
+vc1 = [Chc 1 [Str $ p "mabn"] [Str $ p "xca"], Str $ p "c"]
+multipleAs =  [ Str $ p "x",  Chc 1 ( [Str $ p "aca"] ) ([Str $ p "c"] )]
+share =  [ Str $ p "c",  Chc 1 ( [Str $ p "aba"] ) ([Str  $ p "c"] ), Str $ p "a"]
 
 --Patterns
 cp = PChc (D 1) (ch 'a') (ch 'b')

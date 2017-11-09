@@ -3,68 +3,11 @@ module VPMNew where
 
 import Prelude hiding (seq)
 import Data.Maybe
-import Data.List
+import Data.List as L
+import Data.Text as T
 import Debug.Trace
+import Types
 
-data Atomic = C Char | Wild deriving(Show,Eq)
-
-data Pattern = Plain Atomic
-             | Seq Pattern Pattern
-             | Alt Pattern Pattern
-             | PChc DimTy Pattern Pattern
-             | PChcStar DimTy Pattern Pattern
-             | Repeat Pattern Int {-min-} (Maybe Int) {-max-}
-             --Ex. `a*` => `Repeat (ch 'a') 0 None`
-             | None --Ex. `(a|)b` => `Seq (Alt (ch 'a') None) (ch 'b')
-             | QVar QVarName
-             | Any
-             deriving(Show,Eq)
-             
-type DimVarName = String
-data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
-
-type QVarName = String
-type VString = [Segment]
-
-type Dim = Int
-
-data Segment = Str String | Chc Dim VString VString
-             deriving(Show, Eq)
-             
-type VMatch = (MetaInfo,VString)
-
---The output type of vgrep is a list of pair of VMatch and query variable bindings
-type FinalMatch = (VMatch, QVarEnv)
-
-type Matches = [FinalMatch]
-
-type MetaInfo = (Pos, DimEnv)
-
-type Block  = Int
-type Offset = Int
-
-data Pos = P Block (Either Offset (Pos,Pos))
-         | NoPos
-         deriving(Show,Eq)
-         
-instance Ord Pos where
-  NoPos <= NoPos = True
-  P b o <= NoPos = False
-  NoPos <= P b o = True
-  P b o <= P b' o' 
-    | b < b' = True
-    | b > b' = False
-    | b == b' = case (o,o') of
-                 (Left i, Left i') -> i <= i
-                 (Right (p,p'), Right (q,q')) -> p <= q && p' <= q' --TODO For p<=q and p' > q' we need to merge the vstring to equalize the offsets.   
-         
-type DimEnv = [(String,Dim)]
-
-type QVarEnv = [(String, VMatch)]
-
-data SplitTy = StrSplit FinalMatch Input
-             | PatSplit FinalMatch Pattern
-             deriving(Show)
 
 {- SM - when matching against a plain string, only a pattern split is returned
    PM - When matching against a choice, all the matches can be combined into one
@@ -73,15 +16,12 @@ data Split = NoMatch
            | SM SplitTy  --Single Match
            | PM SplitTy [SplitTy] --Parallel Match (SplitStop, SplitContinue)
            deriving(Show)
-
-type Input = (Pos,VString)
+           
+data SplitTy = StrSplit FinalMatch Input
+             | PatSplit FinalMatch Pattern
+             deriving(Show)
 
 data Alternative = L | R | Both
-
-startPos = (P 0 (Left 0))
-
-emptyMatch :: FinalMatch
-emptyMatch = (((NoPos,[]),[]),[])
 
 vgrep :: Pattern -> VString -> Matches
 vgrep p vs = fst (scan p (nextBlock NoPos vs,vs))
@@ -90,7 +30,7 @@ scan :: Pattern -> Input -> (Matches,Split)
 scan _ (_,[])        = ([],NoMatch)
 scan (QVar x) (i,vs) = ([], SM $ PatSplit (((nextBlock (incBlock (-1) i) vs,[]),vs),[(x,((i,[]),vs))]) (QVar x))
 scan p inp           = case scanOnce p inp of
-  (ms,SM (StrSplit _ inp')) -> {-trace ("Scan "++ show ms ++ show inp')-} (appendMatches (concatMap checkEmpty ms) (scan p inp'))
+  (ms,SM (StrSplit _ inp')) -> {-trace ("Scan "++ show ms ++ show inp')-} (appendMatches (L.concatMap checkEmpty ms) (scan p inp'))
   sp                        -> sp
 {-scan p (i,[v])       = case scanSegment p i v of
    (ms,(SM (StrSplit m s))) -> (appendMatches ((checkEmpty m)++ms) (scan p s))
@@ -120,7 +60,7 @@ scanOnce p (i, v:vs)     = case scanSegment p i v of
    True  -> (ms, SM (StrSplit emptyMatch (nextBlock i vs,vs))))-- same pattern. Would have matched empty string. So ignore that
   (ms,PM sp@(StrSplit m (j,s')) ps) -> (case matchPatSplits i vs (eliminate p ps) of
      []  -> (ms++[m], SM $ StrSplit emptyMatch (correctPos s' i j vs ,s'++vs))
-     (sps) -> {-trace ("Show PMs " ++ show ps ++ show sps) -}(ms ++ (concatMap fst sps) ++ [m], SM $ StrSplit emptyMatch (getShortestSegment (((SM (StrSplit m (correctPos s' i j vs,s'++vs))): (map snd sps))))))
+     (sps) -> {-trace ("Show PMs " ++ show ps ++ show sps) -}(ms ++ (L.concatMap fst sps) ++ [m], SM $ StrSplit emptyMatch (getShortestSegment (((SM (StrSplit m (correctPos s' i j vs,s'++vs))): (L.map snd sps))))))
 
 {-match :: FinalMatch -> Pattern -> Pattern -> Pos -> VString -> (Matches,Split)
 match m p p' i vs = case rigidMatch p' ((getblock i) + 1) vs of
@@ -135,9 +75,9 @@ match m p i [] = ([], SM (PatSplit m p))
 match m p i vs = case rigidMatch p i vs of
   ([],NoMatch)           -> {-trace ("Match: "++show m++ "VS: "++show vs++ "Block:"++ show i ++ "Pattern:" ++ show p)-} (let (pos,vs') = rewind (fromMaybe (nextBlock (P (i-1) (Left 0)) vs) (getPos m), (getMatchVS m) ++ vs)
                             in  ([], SM(StrSplit emptyMatch (pos, vs')))) --rewind
-  (ms',NoMatch)           -> (map (appendVM m) ms',SM(StrSplit emptyMatch (NoPos,[])))
-  (ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> (map (appendVM m) ms',SM(StrSplit emptyMatch s))
-  (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} (map (appendVM m) (m':ms'),SM(StrSplit emptyMatch s)) 
+  (ms',NoMatch)           -> (L.map (appendVM m) ms',SM(StrSplit emptyMatch (NoPos,[])))
+  (ms',SM(StrSplit (((NoPos,[]),[]),[]) s)) -> (L.map (appendVM m) ms',SM(StrSplit emptyMatch s))
+  (ms',SM(StrSplit m' s))-> {-trace ("Scan "++ show (m,m',ms))-} (L.map (appendVM m) (m':ms'),SM(StrSplit emptyMatch s)) 
   (ms',sp@(SM(PatSplit m' p')))-> (ms',sp)--(((map (appendVM m) ms') ++ ms),sp) --Input exhausted
   (ms',sp) -> trace (show ms' ++ "||"++show sp) undefined
     
@@ -146,15 +86,15 @@ matchPatSplits _ vs []                   = []
 matchPatSplits i vs ((PatSplit m p):ps) = (case rigidMatch p ((getblock i) + 1) vs of--appendMatches ms (continue p (nextBlock i) vs split)
      ([],NoMatch)           -> let s = rewind ((fst.fst.fst) m, ((snd.fst) m) ++ vs) --Just return the remaining vs to be scanned
                                in  {-trace ("Here")-} ([],SM $ StrSplit emptyMatch s) : matchPatSplits i vs ps--rewind
-     (ms',sp@(SM(StrSplit (((NoPos,[]),[]),[]) s))) -> {-trace ("Empty Str : " ++ show m++ show ms' ++ show sp)-} ((map (appendVM m) ms',sp ): matchPatSplits i vs ps)
-     (ms',SM(StrSplit m' s))-> {-trace ("Str "++ show (m,m',ms'))-} (map (appendVM m) (m':ms'),SM $ StrSplit emptyMatch s) :matchPatSplits i vs ps
-     (ms',sp@(SM(PatSplit m' p'')))-> {-trace ("or here" ++ show ms' ++ show sp)-} ((map (appendVM m)ms',sp) : matchPatSplits i vs ps))--(((map (appendVM m) ms') ++ ms),sp)
+     (ms',sp@(SM(StrSplit (((NoPos,[]),[]),[]) s))) -> {-trace ("Empty Str : " ++ show m++ show ms' ++ show sp)-} ((L.map (appendVM m) ms',sp ): matchPatSplits i vs ps)
+     (ms',SM(StrSplit m' s))-> {-trace ("Str "++ show (m,m',ms'))-} (L.map (appendVM m) (m':ms'),SM $ StrSplit emptyMatch s) :matchPatSplits i vs ps
+     (ms',sp@(SM(PatSplit m' p'')))-> {-trace ("or here" ++ show ms' ++ show sp)-} ((L.map (appendVM m)ms',sp) : matchPatSplits i vs ps))--(((map (appendVM m) ms') ++ ms),sp)
 
   
 scanSegment :: Pattern -> Pos -> Segment -> (Matches,Split)
 scanSegment p@(PChc _ _ _) i s                        = scanChoicePattern True p i s
 scanSegment p@(PChcStar _ _ _) i s                    = let r = scanChoiceStarPattern p i s in {-trace (show p ++ show s ++ show r)-} r
-scanSegment p i (Str "")                              = {-trace ("IsNOne: "++show p)-} ([],SM (PatSplit (((i,[]),[Str ""]),[]) p ))
+scanSegment p i (Str empty)                              = {-trace ("IsNOne: "++show p)-} ([],SM (PatSplit (((i,[]),[Str empty]),[]) p ))
 scanSegment p i (Str s)                               = 
   ([],scanStr p (i, s))
 scanSegment p i@(P b (Right (lpos,rpos))) c1@(Chc d l r) = {-trace ("Scan Seg "++show i ++ show c1  )-}
@@ -227,18 +167,18 @@ combineStar isCStar pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(StrSplit m
 combineStar isCStar pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (QVar x)) ) = 
   ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
 combineStar isCStar pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', NoMatch)
-  | not $ null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not $ L.null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | otherwise      = ([],NoMatch)
 combineStar isCStar pos d dy (ms, NoMatch) (ms', SM(PatSplit ma' (QVar x)) ) 
-  | not $ null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not $ L.null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | otherwise      = ([],NoMatch)
 combineStar isCStar pos d dy a@(ms, NoMatch) b@(ms', SM(PatSplit ma' p) ) 
-  | not $ null ms && isCStar = {-trace ("Combine"++show a ++ " And "++show b )-} ([combine'' pos d dy m m' | m <- tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (head ms) ma') (PChcStar dy None p)))
-  | not $ null ms = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (head ms) ma') (PChc dy None p)))
+  | not $ L.null ms && isCStar = {-trace ("Combine"++show a ++ " And "++show b )-} ([combine'' pos d dy m m' | m <- L.tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (L.head ms) ma') (PChcStar dy None p)))
+  | not $ L.null ms = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (L.head ms) ma') (PChc dy None p)))
   | otherwise      = ([],NoMatch)
 combineStar isCStar pos d dy (ms', SM(PatSplit ma' p) ) (ms, NoMatch)
-  | not $ null ms && isCStar = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (head ms) ) (PChcStar dy p None)))
-  | not $ null ms   = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (head ms)) (PChc dy p None)))
+  | not $ L.null ms && isCStar = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (L.head ms) ) (PChcStar dy p None)))
+  | not $ L.null ms   = ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (L.head ms)) (PChc dy p None)))
   | otherwise      = ([],NoMatch)
 combineStar _ _ _ _ ms ms' = {-trace ("Combine: "++ show ms ++ " And " ++ show ms')-} ([],NoMatch) 
 
@@ -260,27 +200,27 @@ combine isCStar pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(StrSplit ma' (
 combine isCStar pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (QVar x)) ) = 
   ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
 combine isCStar pos d dy (ms, SM(PatSplit ma (None)) ) (ms', SM(StrSplit ma' (i,s)))  
-  | not isCStar && null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not isCStar && L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | isCStar          = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (i,s)))
 combine isCStar pos d dy (ms, SM(StrSplit ma (i,s))) (ms', SM(PatSplit ma' (None)) ) 
-  | not isCStar && null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not isCStar && L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | isCStar            = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (i,s)))
 combine isCStar pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', NoMatch)
-  | not $ null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not $ L.null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | otherwise      = ([],NoMatch)
 combine isCStar pos d dy (ms, NoMatch) (ms', SM(PatSplit ma' (QVar x)) ) 
-  | not $ null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | not $ L.null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
   | otherwise      = ([],NoMatch)
 combine isCStar pos d dy a@(ms, SM(StrSplit ma (l,v1))) b@(ms', SM(StrSplit ma' (r,v2)))
   | isCStar = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (insertPos Both pos l r,[Chc d v1 v2])))
   | otherwise = ([],NoMatch)
 combine isCStar pos d dy a@(ms, NoMatch) b@(ms', SM(PatSplit ma' p) ) 
-  | isNone p  && (not $ null ms) && isCStar  =  ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch) --Pchc none none case
-  | not $ null ms && isCStar = let r = ([combine'' pos d dy m m' | m <- tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (head ms) ma') (PChcStar dy None p))) in {-trace ("Combine"++show a ++ " And "++show b ++ "AND " ++ show r) -} r
+  | isNone p  && (not $ L.null ms) && isCStar  =  ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch) --Pchc none none case
+  | not $ L.null ms && isCStar = let r = ([combine'' pos d dy m m' | m <- L.tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos (L.head ms) ma') (PChcStar dy None p))) in {-trace ("Combine"++show a ++ " And "++show b ++ "AND " ++ show r) -} r
   | otherwise      = ([],NoMatch)
 combine isCStar pos d dy (ms', SM(PatSplit ma' p) ) (ms, NoMatch)
-  | isNone p && (not $ null ms) && isCStar  =  ([combine'' pos d dy m' m | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-  | not $ null ms && isCStar = ([combine'' pos d dy m' m | m <- tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (head ms) ) (PChcStar dy p None)))
+  | isNone p && (not $ L.null ms) && isCStar  =  ([combine'' pos d dy m' m | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
+  | not $ L.null ms && isCStar = ([combine'' pos d dy m' m | m <- L.tail ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (PatSplit (combineAlternative d dy pos ma' (L.head ms) ) (PChcStar dy p None)))
   | otherwise      = ([],NoMatch)
 --combine isCStar 
 {-combine isCStar pos d dy a@(ms, NoMatch) b@(ms', SM(PatSplit ma' p) ) 
@@ -297,7 +237,7 @@ or' :: (Matches,Split) -> (Matches,Split) -> (Matches,Split)
 or' ([],NoMatch) ms = ms
 or' ms ([],NoMatch) = ms
 or' (ms,sp1@(SM (StrSplit m s))) (ms',sp2@(SM (StrSplit m' s'))) =
-  (concatMap checkEmpty [m,m'] ++ (ms++ms'),SM $ StrSplit emptyMatch (getShortestSegment ([sp1,sp2]) ))
+  (L.concatMap checkEmpty [m,m'] ++ (ms++ms'),SM $ StrSplit emptyMatch (getShortestSegment ([sp1,sp2]) ))
 or' (ms,(SM sp1@(PatSplit m p))) (ms',(SM sp2@(PatSplit m' p'))) =
   (ms++ms', PM (StrSplit emptyMatch (NoPos,[])) [sp1,sp2])
 or' (ms,sp1@(SM (StrSplit m s))) (ms',(SM sp2@(PatSplit m' p'))) =
@@ -307,13 +247,13 @@ or' (ms,(SM sp1@(PatSplit m p))) (ms',sp2@(SM (StrSplit m' s'))) =
 or' (ms,sp1@(PM (StrSplit m s) ps)) (ms',(SM sp2@(PatSplit m' p'))) =
   (checkEmpty m ++ ms++ms', PM (StrSplit emptyMatch s) (sp2:ps))
 or' (ms,sp1@(PM (StrSplit m s) ps)) (ms',sp2@(SM (StrSplit m' s'))) =
-  (concatMap checkEmpty [m,m'] ++ ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,sp2])) ps)
+  (L.concatMap checkEmpty [m,m'] ++ ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,sp2])) ps)
 or' (ms,(SM sp1@(PatSplit m p))) (ms',(PM (StrSplit m' s') ps')) =
   (checkEmpty m'++ ms++ms', PM (StrSplit emptyMatch s') (sp1:ps'))
 or' (ms,sp1@(SM (StrSplit m s))) (ms',(PM sp2@(StrSplit m' s') ps'))  =
-  (concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,SM sp2])) ps')
+  (L.concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,SM sp2])) ps')
 or' (ms,(PM sp1@(StrSplit m s) ps)) (ms',(PM sp2@(StrSplit m' s') ps')) = 
-  (concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [SM sp1, SM sp2])) (ps++ps'))
+  (L.concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [SM sp1, SM sp2])) (ps++ps'))
 or' ms _  = ms--trace ("or':"++show ms ++ show ms') undefined
 
 
@@ -326,11 +266,11 @@ rigidMatch p b (v:vs)   = case (matchSegment p b v) of
   (ms,SM (PatSplit m p'))            -> {-trace ("PatSplit "++show p' ++ show m ++ show vs)-} appendMatches ms (match m p' (b+1) vs)
   (ms,PM sp@(StrSplit m (j,s')) ps) -> {-trace ("PM " ++ show ms ++ show sp ++ show ps ++ show vs)-} (case matchPatSplits (nextBlock (P (b-1) (Left 0)) vs) vs (eliminate p ps) of
      []    -> (ms,SM (StrSplit m (j,s'++vs)))--appendMatches (ms) (addMatch m (scan p (j,s'++vs)))
-     (sps) -> (ms ++ (concatMap fst sps), SM (StrSplit m (getShortestSegment (((SM sp): (map snd sps)))))))
+     (sps) -> (ms ++ (L.concatMap fst sps), SM (StrSplit m (getShortestSegment (((SM sp): (L.map snd sps)))))))
   (ms, sp)                     -> trace ("RigidMatch: "++show ms ++ " and "++show sp) undefined
 
 matchSegment :: Pattern -> Block-> Segment -> (Matches,Split)
-matchSegment p b (Str "")       = ([],SM (PatSplit (((P b (Left 0),[]),[Str ""]),[]) p ))
+matchSegment p b (Str empty)       = ([],SM (PatSplit (((P b (Left 0),[]),[Str empty]),[]) p ))
 matchSegment p@(PChc _ _ _) b s =  (scanChoicePattern False p (nextBlock (P (b-1) (Left 0) ) [s]) s )
 matchSegment p@(PChcStar _ _ _) b s =  (matchChoiceStarPattern p (nextBlock (P (b-1) (Left 0) ) [s]) s )
 matchSegment p b (Str s)        = let ma = ([],matchStr p (P b (Left 0) ) s) in{- trace ("match segment STR " ++ show p ++ show s ++ " , " ++(show (snd ma)))-} ma
@@ -351,31 +291,32 @@ combineAlternatives d p ([], SM(StrSplit (((NoPos,[]),[]),[])  _))
   --What about non empty matches and NoMatch
 combineAlternatives d p (ms,split) ([],NoMatch)     = 
   let (ms',sp) = mergeAlt d p split NoMatch 
-  in ((map (addAlternative L d p) ms) ++ ms', sp )
+  in ((L.map (addAlternative L d p) ms) ++ ms', sp )
 combineAlternatives d p ([],NoMatch) (ms,split)     = 
   let (ms',sp) =  mergeAlt d p NoMatch split
-  in {-trace ("Combine "++show sp)-} ((map (addAlternative R d p) ms) ++ ms', sp )
+  in {-trace ("Combine "++show sp)-} ((L.map (addAlternative R d p) ms) ++ ms', sp )
 combineAlternatives d p (ms,split) (ms',split')     = 
   let (ms'',sp) = mergeAlt d p split split'
-  in ((concatMap (\m -> if m == emptyMatch then [] else [ addAlternative L d p m]) ms)++(map (addAlternative R d p) ms')++ms'',
+  in ((L.concatMap (\m -> if m == emptyMatch then [] else [ addAlternative L d p m]) ms)++(L.map (addAlternative R d p) ms')++ms'',
    sp) --Check for overlapping
 
-scanStr :: Pattern -> (Pos,String) -> Split
+scanStr :: Pattern -> (Pos,Text) -> Split
 scanStr None (i,s)
-  | s == ""                           = (SM (StrSplit (((i,[]),[Str ""]),[]) ( incOffset i,vStr "")))
+  | T.null s                          = (SM (StrSplit (((i,[]),[Str empty]),[]) ( incOffset i,vStr empty)))
   | otherwise                         = NoMatch 
 scanStr p (i,matchStr p i-> SM s)     = {-trace (show s)-} (SM s)
 scanStr p (i,matchStr p i-> PM s1 s2) = undefined
-scanStr p (i,_:s)                     = (scanStr p (incOffset i,s))
-scanStr _ (_,[])                      = NoMatch
+scanStr p (i,s)                     
+  | T.null s              = NoMatch
+  | otherwise             = (scanStr p (incOffset i,s))
 
-matchStr :: Pattern -> Pos -> String -> Split
+matchStr :: Pattern -> Pos -> Text -> Split
 matchStr (QVar x) pos vs              = SM $ PatSplit (((pos,[]),[Str vs]),[(x,((pos,[]),[Str vs]))]) (QVar x)
-matchStr (Plain (C d)) pos (c:s)
-                     | c==d           = {-trace (show (pos) ++ (show c) ++ show (incOffset pos) ++ s++ "\n")-} SM $ StrSplit (((pos,[]),[Str[c]]),[]) 
-                                                       (incOffset pos,vStr s)
-matchStr (Plain Wild) pos (c:s)       = (SM $ StrSplit (((pos,[]),[Str[c]]),[]) 
-                                                       (incOffset pos,vStr s))
+matchStr (Plain (C d)) pos s
+                     | not $ T.null s && (T.head s)==d           = {-trace (show (pos) ++ (show c) ++ show (incOffset pos) ++ s++ "\n")-} SM $ StrSplit (((pos,[]),[Str (T.singleton$ T.head s)]),[]) (incOffset pos,vStr (T.tail s))
+matchStr (Plain Wild) pos s  
+  | not $ T.null s   = (SM $ StrSplit (((pos,[]),[Str (T.singleton $ T.head s)]),[]) 
+                                                       (incOffset pos,vStr (T.tail s)))
 matchStr (Seq p p') pos s             = case matchStr p pos s of
   NoMatch                              -> NoMatch
   sp@(SM (StrSplit m (pos',[Str s']))) -> sp `andThen` matchStr p' pos' s'
@@ -391,7 +332,7 @@ matchStr (PChc (_) p q) pos s         =
 matchStr (PChcStar (_) p q) pos s     = {-trace ("Match Str: "++show pos ++ show s)-} (matchStr p pos s `and''`
   matchStr q pos s)
 matchStr (None) pos s                 
-  | s == ""                           = (SM (StrSplit (((pos,[]),[Str ""]),[]) ( incOffset pos,vStr "")))
+  | T.null s                          = (SM (StrSplit (((pos,[]),[Str T.empty]),[]) ( incOffset pos,vStr empty)))
   | otherwise                         = NoMatch
 matchStr p pos s                      = NoMatch
 {-matchStr (Seq a p)    pos (c:[])      = matchStr a pos [c] `andThen` 
@@ -402,8 +343,10 @@ matchStr (Seq a p)    pos (c:s)       = matchStr a pos [c] `andThen`
 
 
 -------Helpers------------------------------------
-vStr [] = []
-vStr s  = [Str s]
+vStr :: Text -> VString
+vStr s  
+  | T.null s    = []
+  | otherwise = [Str s]
 
 getblock :: Pos -> Int
 getblock NoPos   = 0
@@ -491,7 +434,7 @@ noDupVar [] [] = []
 noDupVar [] xs = xs
 noDupVar xs [] = xs
 noDupVar ((x,vs):xs) xs' = --[if x==y then mergeQVar else | (x,vs) <- xs, (y,vs') <- xs',]
-  case find (\(a,_)-> x == a) xs' of
+  case L.find (\(a,_)-> x == a) xs' of
     Just (y,vs') -> (x,appendQVar vs vs') : noDupVar xs (xs'\\[(y,vs')])
     Nothing      -> (x,vs): noDupVar xs (xs') 
     
@@ -500,7 +443,7 @@ noDupDim [] [] = []
 noDupDim [] xs = xs
 noDupDim xs [] = xs
 noDupDim ((x,vs):xs) xs' = --[if x==y then mergeQVar else | (x,vs) <- xs, (y,vs') <- xs',]
-  case find (\(a,_)-> x == a) xs' of
+  case L.find (\(a,_)-> x == a) xs' of
     Just (y,vs') -> (x,vs) : noDupDim xs (xs'\\[(y,vs')])
     Nothing      -> (x,vs): noDupDim xs (xs')
 
@@ -513,7 +456,7 @@ appendQVar ((pos,ds),vs) ((pos',ds'),vs')
 combineStr :: VString -> VString
 combineStr []                              = []
 combineStr [m]                             = [m]
-combineStr ((Str s) : (Str s') : ms)     = combineStr ((Str (s++s')):ms)
+combineStr ((Str s) : (Str s') : ms)     = combineStr ((Str (T.append s s')):ms)
 combineStr (Str s : m1@(Chc _ _ _ ): ms) = (Str s) : m1 : combineStr ms
 combineStr (m1@(Chc _ _ _ ) :ms )         = m1 : combineStr ms
 
@@ -610,10 +553,11 @@ wrapChoice d pos (PatSplit m p) (PatSplit m' p') =
   in ([], PM (StrSplit emptyMatch (NoPos,[]) ) [p1,p2])
   
 rewind :: Input -> Input
-rewind (p,[])                                    = (p,[])
-rewind (p,Str "" : vs)                           = (nextBlock p vs,vs)
-rewind (p@(P b (Left o)), (Str [c]):vs)          = (nextBlock p vs {-P (b+1) (Left 0)-}, vs)
-rewind (P b (Left o), (Str (s:ss)):vs)           = (P b (Left (o+1)), (Str ss) : vs)
+rewind (p,[])                                    = (p,[]) 
+rewind (p@(P b (Left o)), (Str ss):vs) 
+  | T.null ss          = (nextBlock p vs,vs)
+  | T.length ss == 1   = (nextBlock p vs {-P (b+1) (Left 0)-}, vs)
+  | otherwise          = (P b (Left (o+1)), (Str (T.tail ss)) : vs)
 rewind (p@(P b (Right (l,r))), (Chc d v1 v2):vs) = 
   case (rewind (l,v1), rewind (r,v2)) of
     ((l',[]),(r',[]))   -> (nextBlock p vs, vs)

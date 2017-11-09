@@ -1,6 +1,7 @@
 module VPMTest where
 
 import VPM
+import Types
 import Prelude hiding (seq)
 
 
