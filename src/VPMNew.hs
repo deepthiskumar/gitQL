@@ -94,9 +94,10 @@ matchPatSplits i vs ((PatSplit m p):ps) = (case rigidMatch p ((getblock i) + 1) 
 scanSegment :: Pattern -> Pos -> Segment -> (Matches,Split)
 scanSegment p@(PChc _ _ _) i s                        = scanChoicePattern True p i s
 scanSegment p@(PChcStar _ _ _) i s                    = let r = scanChoiceStarPattern p i s in {-trace (show p ++ show s ++ show r)-} r
-scanSegment p i (Str empty)                              = {-trace ("IsNOne: "++show p)-} ([],SM (PatSplit (((i,[]),[Str empty]),[]) p ))
-scanSegment p i (Str s)                               = 
-  ([],scanStr p (i, s))
+--scanSegment p i (Str empty)                              = {-trace ("IsNOne: "++show p)-} ([],SM (PatSplit (((i,[]),[Str empty]),[]) p ))
+scanSegment p i (Str s)                                
+  | T.null s  = ([],SM (PatSplit (((i,[]),[Str T.empty]),[]) p ))
+  | otherwise = ([],scanStr p (i, s))
 scanSegment p i@(P b (Right (lpos,rpos))) c1@(Chc d l r) = {-trace ("Scan Seg "++show i ++ show c1  )-}
   (let c = combineAlternatives d i (scan p (lpos,l)) (scan p (rpos,r))
   in {-trace ("Scan Segment" ++ show p ++ show i ++ ","++ show (l,r) ++ " , "++show (scan p (lpos,l))++" , "++ show (scan p (rpos,r))++" , "++ show c)-} c )
@@ -308,12 +309,12 @@ scanStr p (i,matchStr p i-> SM s)     = {-trace (show s)-} (SM s)
 scanStr p (i,matchStr p i-> PM s1 s2) = undefined
 scanStr p (i,s)                     
   | T.null s              = NoMatch
-  | otherwise             = (scanStr p (incOffset i,s))
+  | otherwise             = (scanStr p (incOffset i,T.tail s))
 
 matchStr :: Pattern -> Pos -> Text -> Split
 matchStr (QVar x) pos vs              = SM $ PatSplit (((pos,[]),[Str vs]),[(x,((pos,[]),[Str vs]))]) (QVar x)
 matchStr (Plain (C d)) pos s
-                     | not $ T.null s && (T.head s)==d           = {-trace (show (pos) ++ (show c) ++ show (incOffset pos) ++ s++ "\n")-} SM $ StrSplit (((pos,[]),[Str (T.singleton$ T.head s)]),[]) (incOffset pos,vStr (T.tail s))
+  | (not $ T.null s) && (T.head s)==d           = {-trace (show (pos) ++ (show (T.head s)) ++ show (incOffset pos) ++(show (T.tail s))++ "\n")-} SM $ StrSplit (((pos,[]),[Str (T.singleton$ T.head s)]),[]) (incOffset pos,vStr (T.tail s))
 matchStr (Plain Wild) pos s  
   | not $ T.null s   = (SM $ StrSplit (((pos,[]),[Str (T.singleton $ T.head s)]),[]) 
                                                        (incOffset pos,vStr (T.tail s)))

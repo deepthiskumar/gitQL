@@ -33,15 +33,29 @@ data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
 type QVarName = String
 
 --Variational Match
+
+type Matches = [VMatch]
+data VMatch  = VMatch{ metaInfo :: MetaInfo,
+                       vstring :: VString,
+                       qvar :: QVarEnv}
+  deriving(Eq)
+  
+instance Show VMatch where
+  show (VMatch m v q) = "(("++show m++","++show v++"),"++show q++")"
              
-type VMatch = (MetaInfo,VString)
+{-type VMatch = (MetaInfo,VString)
 
 --The output type of vgrep is a list of pair of VMatch and query variable bindings
 type FinalMatch = (VMatch, QVarEnv)
 
 type Matches = [FinalMatch]
+-}
 
 type MetaInfo = (Pos, DimEnv)
+
+type DimEnv = [(String,Dim)]
+
+type QVarEnv = [(String, (MetaInfo, VString))]
 
 type Block  = Int
 type Offset = Int
@@ -49,6 +63,12 @@ type Offset = Int
 data Pos = P Block (Either Offset (Pos,Pos))
          | NoPos
          deriving(Show,Eq)
+         
+data VPos = StrP Block Offset
+          | ChcP Block Pos Pos
+          | NoVPos
+          deriving(Show, Eq)
+
          
 instance Ord Pos where
   NoPos <= NoPos = True
@@ -61,13 +81,11 @@ instance Ord Pos where
                  (Left i, Left i') -> i <= i
                  (Right (p,p'), Right (q,q')) -> p <= q && p' <= q' --TODO For p<=q and p' > q' we need to merge the vstring to equalize the offsets.   
          
-type DimEnv = [(String,Dim)]
 
-type QVarEnv = [(String, VMatch)]
 
 
 
 startPos = (P 0 (Left 0))
 
-emptyMatch :: FinalMatch
-emptyMatch = (((NoPos,[]),[]),[])
+emptyMatch :: VMatch
+emptyMatch = VMatch (NoPos,[]) [] []
