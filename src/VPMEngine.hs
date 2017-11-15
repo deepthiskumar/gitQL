@@ -83,7 +83,18 @@ continue s@(PM sp@(StrSplit m (j,s')) ps) = do
                 []  -> put (VPMEnv pat (j,s'++vs) (matches env))--(ms, extract $ SM (StrSplit m (j,s'++vs)))
                 sps -> put (VPMEnv pat (getShortestSegment (((SM sp): (L.map snd sps)))) (matches env ++ (L.concatMap fst sps)))
               scan
-                
+
+match :: VPMState Split
+match = do
+  env <- get
+  let pat = pattern env
+  let (i,inp) = input env
+  case inp of
+    []   -> (return NoMatch)
+    v:vs -> do
+            put (VPMEnv pat (nextBlock i vs,vs) (matches env))
+            sp <- matchSegment emptyMatch pat (i,v)
+            return sp                
 
 scanSegment :: Pattern -> (Pos, Segment) -> VPMState Split
 scanSegment p (i,Str s)        = return $  scanStr p (i,s)
@@ -145,38 +156,73 @@ matchStrConditions m p i (Str s) = case matchStr p i s of
 scanChoice :: Pattern -> (Pos,Segment) -> VPMState Split
 scanChoice (QVar x) (i,c) = return $ matchQVar x i c
 scanChoice Any (i,c)      = return $ matchAny i c
+scanChoice p@(PChc _ _ _) c = matchCP emptyMatch p c
 scanChoice p (i,Chc d l r)= do
   let (spl,sl) = runState scan (VPMEnv p (getLeftPos i l,l) [])
   let (spr,sr) = runState scan (VPMEnv p (getRightPos i r,r) [])
   env <- get
   let (ms, sp)  = mergeAlt d i spl spr
   let mat = ms ++ (inRight i d (matches sr)) ++ (inLeft i d (matches sl))++ matches env
-  put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well
+  put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well ** Done in Continue
   return sp
 
 matchChoice :: VMatch -> Pattern -> (Pos,Segment) -> VPMState Split
 matchChoice m (QVar x) (i,c) = (return $ matchQVar x i c)
 matchChoice m Any (i,c)      = (return $ matchAny i c)
-matchChoice m p (i, Chc d l r) = (do
+matchChoice m p@(PChc _ _ _) c = matchCP m p c
+matchChoice m p (i, c@(Chc d l r)) = (do
   let (spl,sl) = runState match (VPMEnv p (getLeftPos i l,l) [])
   let (spr,sr) = runState match (VPMEnv p (getRightPos i r,r) [])
   env <- get
   let (ms, sp)  = mergeAlt d i spl spr
-  let mat = L.map (appendVM m) ((inRight i d (matches sr)) ++ (inLeft i d (matches sl))++ms)
-  put (VPMEnv (pattern env) (input env) (mat ++ matches env)) --TODO update the input as well
-  return $ prefixMatchSp m sp)
+  let mat = (L.map (appendVM m) ((inRight i d (matches sr)) ++ (inLeft i d (matches sl))++ms)) ++ matches env
+  case (sp, isEmptyMatch m) of
+    (NoMatch, False) -> let s' =  (rewind (fst $ metaInfo m, (vstring m) ++ [c] ))
+                        in put (VPMEnv (pattern env) (prependInput s' (input env)) mat)
+    otherwise        -> put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well ** Done in Continue
+  return $ prefixMatchSp m sp)            
 
-match :: VPMState Split
-match = do
+matchCP :: VMatch -> Pattern -> (Pos,Segment) -> VPMState Split
+matchCP m p@(PChc (D dim) lp rp) (i,c@(Chc d l r)) 
+  | dim == d = do
+    let (spl,sl) = runState match (VPMEnv lp (getLeftPos i l,l) [])
+    let (spr,sr) = runState match (VPMEnv rp (getRightPos i r,r) [])
+    env <- get
+    let (ms, sp) = combine i d (D dim) (matches sl,spl) (matches sr,spr)
+    let mat = (L.map (appendVM m) ms) ++ matches env
+    case (sp, isEmptyMatch m) of
+      (NoMatch, False) -> let s' =  (rewind (fst $ metaInfo m, (vstring m) ++ [c] ))
+                          in put (VPMEnv (pattern env) (prependInput s' (input env)) mat)
+      otherwise        -> put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well ** Done in Continue
+    return $ prefixMatchSp m sp
+  | otherwise = do
+    --See if it is nested
+    let (spl,sl) = runState scan (VPMEnv p (getLeftPos i l,l) [])
+    let (spr,sr) = runState scan (VPMEnv p (getRightPos i r,r) [])
+    env <- get
+    let (ms, sp)  = mergeAlt d i spl spr
+    let mat = (L.map (appendVM m) ((inRight i d (matches sr)) ++ (inLeft i d (matches sl))++ms)) ++ matches env
+    case (sp, isEmptyMatch m) of
+      (NoMatch, False) -> let s' =  (rewind (fst $ metaInfo m, (vstring m) ++ [c] ))
+                          in put (VPMEnv (pattern env) (prependInput s' (input env)) mat)
+      otherwise        -> put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well ** Done in Continue
+    return $ prefixMatchSp m sp
+matchCP m p@(PChc (DVar dvar) lp rp) (i,c@(Chc d l r)) = do
   env <- get
-  let pat = pattern env
-  let (i,inp) = input env
-  case inp of
-    []   -> (return NoMatch)
-    v:vs -> do
-            put (VPMEnv pat (nextBlock i vs,vs) (matches env))
-            sp <- matchSegment emptyMatch pat (i,v)
-            return sp 
+  let (spl,sl) = runState match (VPMEnv lp (getLeftPos i l,l) [])
+  let (spr,sr) = runState match (VPMEnv rp (getRightPos i r,r) [])
+  let (ms, sp) = combine i d (DVar dvar) (matches sl,spl) (matches sr,spr)
+  --search for nested choices as well
+  let (spl',sl') = runState scan (VPMEnv p (getLeftPos i l,l) [])
+  let (spr',sr') = runState scan (VPMEnv p (getRightPos i r,r) [])
+  let (ms', sp') = mergeAlt d i spl' spr'
+  let (fms, fsp) = (ms', sp') `or'` (ms, sp)
+  let mat = (L.map (appendVM m) fms) ++ (matches env)
+  case (fsp, isEmptyMatch m) of
+      (NoMatch, False) -> let s' =  (rewind (fst $ metaInfo m, (vstring m) ++ [c] ))
+                          in put (VPMEnv (pattern env) (prependInput s' (input env)) mat)
+      otherwise        -> put (VPMEnv (pattern env) (input env) mat) --TODO update the input as well ** Done in Continue
+  return $ prefixMatchSp m fsp
 --------------------------------------------------------------------------------------
 --Helpers
 
@@ -191,6 +237,10 @@ incOffset :: Pos -> Int -> Pos
 incOffset NoPos _          = startPos
 incOffset (P b (Left o)) i = P b (Left (o+i)) 
 incOffset p _              = trace (show p) undefined
+
+incBlock :: Int -> Pos -> Pos
+incBlock _ NoPos   = NoPos
+incBlock i (P b o) = P (b+i) o
 
 andThen :: Split -> Split-> Split
 andThen NoMatch _                                 = NoMatch
@@ -235,6 +285,24 @@ appendQVar :: (MetaInfo, VString) -> (MetaInfo, VString) -> (MetaInfo, VString)
 appendQVar ((pos,ds),vs) ((pos',ds'),vs') 
  | pos <= pos' = ((pos,ds++ds'),vs++vs')
  | otherwise   = ((pos',ds++ds'),vs'++vs)
+ 
+combine'' :: Pos -> Dim -> DimTy -> VMatch -> VMatch -> VMatch
+combine'' p d dy m m'
+ | isEmptyMatch m  || isEmptyMatch m' = emptyMatch
+combine'' p d dy (VMatch (l,dimVars) vs qvars) (VMatch (r,dimVars') vs' qvars') = 
+  (VMatch (insertPos p l r, updateDimEnv dy d (dimVars ++ dimVars')) [Chc d vs vs']  ((inLVar p d qvars) ++ (inRVar p d qvars')))
+  
+updateDimEnv :: DimTy -> Dim -> DimEnv -> DimEnv
+updateDimEnv (D _) _ dimenv = dimenv
+updateDimEnv (DVar d) dim dimenv 
+ | not $ dimPresent d dimenv = (d,dim) : dimenv
+ | otherwise = dimenv
+
+dimPresent :: String -> DimEnv -> Bool
+dimPresent _ [] = False
+dimPresent x ((d,val):ds) 
+  | x == d = True
+  | otherwise = dimPresent x ds
 
 combineStr :: VString -> VString
 combineStr []                              = []
@@ -385,6 +453,44 @@ combineSplit p d (SM (StrSplit m'' (i,s))) sp@(SM x@(PatSplit m p'))
    | otherwise  = ((inLeft p d [m'']),PM (StrSplit emptyMatch (insertPos p i NoPos),[Chc d s []]) (inRSplitTys p d [x]))
 combineSplit p d (PM s ss)-}
 
+--mergeAltForCP ::
+
+combine :: Pos -> Dim -> DimTy -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
+combine pos d dy (ms,NoMatch) (ms',NoMatch) =
+  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy a@(ms, SM(StrSplit ma (_,[]))) b@(ms', SM(StrSplit ma' (_,[]))) = {-trace ("Combine" ++ show ms ++ show ma ++ show ms' ++ show ma')-}
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(PatSplit ma None)) (ms', SM(PatSplit ma' None)) = 
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
+combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(PatSplit ma' (QVar y)) ) =
+  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit (combine'' pos d dy ma ma' ) (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(PatSplit m p)) (ms', SM(PatSplit m' q)) = {-trace (show p ++ " AND " ++ show q)-}
+  ([combine'' pos d dy ma ma' | ma <- ms, ma' <- ms', ma/= emptyMatch, ma'/= emptyMatch], SM(PatSplit (combine'' pos d dy m m') (PChc dy p q)))
+  -- TODO should match only the same dimension if the next segment is a choice
+combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(StrSplit ma' (_,[]))) = 
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (QVar x)) ) = 
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(PatSplit ma (Any)) ) (ms', SM(StrSplit ma' (_,[]))) = 
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (Any)) ) = 
+  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(PatSplit ma (None)) ) (ms', SM(StrSplit ma' (i,s)))  
+  | L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(StrSplit ma (i,s))) (ms', SM(PatSplit ma' (None)) ) 
+  | L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', NoMatch)
+  | not $ L.null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | otherwise      = ([],NoMatch)
+combine pos d dy (ms, NoMatch) (ms', SM(PatSplit ma' (QVar x)) ) 
+  | not $ L.null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
+  | otherwise      = ([],NoMatch)
+combine pos d dy a@(ms, SM(StrSplit ma (l,v1))) b@(ms', SM(StrSplit ma' (r,v2))) = ([],NoMatch)
+combine pos d dy a@(ms, NoMatch) b@(ms', SM(PatSplit ma' p) ) = ([],NoMatch)
+combine pos d dy (ms', SM(PatSplit ma' p) ) (ms, NoMatch) = ([],NoMatch)
+combine _ _ _ ms ms' = {-trace ("Combine: "++ show ms ++ " And " ++ show ms')-} ([],NoMatch)
+--TODO Add Any NoMatch and NoMatch Any?
+
 --wrap the matches within split with the choice and create a single split
 
 mergeAlt :: Dim -> Pos -> Split -> Split ->  (Matches,Split)
@@ -487,11 +593,39 @@ matchPatSplits i vs ((PatSplit m p):ps) =
    let (sp,st) = runState match (VPMEnv p (i,vs) [])
    in case (matches st ,sp) of
         ([],NoMatch)           -> let s = rewind (fst $ metaInfo m, (vstring m) ++ vs) --Just return the remaining vs to be scanned
-                   in ([],SM $ StrSplit emptyMatch s) : matchPatSplits i vs ps
+                                  in ([],SM $ StrSplit emptyMatch s) : matchPatSplits i vs ps
         (ms,sp@(SM (StrSplit (VMatch (NoPos,[]) [] []) s))) -> (L.map (appendVM m) ms,sp ): matchPatSplits i vs ps
         (ms,SM(StrSplit m' s)) -> (L.map (appendVM m) (m':ms),SM $ StrSplit emptyMatch s) :matchPatSplits i vs ps
         (ms,sp@(SM(PatSplit m' p'')))-> (L.map (appendVM m) ms ,sp) : matchPatSplits i vs ps
 
+
+or' :: (Matches,Split) -> (Matches,Split) -> (Matches,Split)
+or' ([],NoMatch) ms = ms
+or' ms ([],NoMatch) = ms
+or' (ms,sp1@(SM (StrSplit m s))) (ms',sp2@(SM (StrSplit m' s'))) =
+  (L.concatMap checkEmpty [m,m'] ++ (ms++ms'),SM $ StrSplit emptyMatch (getShortestSegment ([sp1,sp2]) ))
+or' (ms,(SM sp1@(PatSplit m p))) (ms',(SM sp2@(PatSplit m' p'))) =
+  (ms++ms', PM (StrSplit emptyMatch (NoPos,[])) [sp1,sp2])
+or' (ms,sp1@(SM (StrSplit m s))) (ms',(SM sp2@(PatSplit m' p'))) =
+  (checkEmpty m ++ ms++ms', PM (StrSplit emptyMatch s) [sp2])
+or' (ms,(SM sp1@(PatSplit m p))) (ms',sp2@(SM (StrSplit m' s'))) =
+  (checkEmpty m' ++ ms++ms', PM (StrSplit emptyMatch s') [sp1])
+or' (ms,sp1@(PM (StrSplit m s) ps)) (ms',(SM sp2@(PatSplit m' p'))) =
+  (checkEmpty m ++ ms++ms', PM (StrSplit emptyMatch s) (sp2:ps))
+or' (ms,sp1@(PM (StrSplit m s) ps)) (ms',sp2@(SM (StrSplit m' s'))) =
+  (L.concatMap checkEmpty [m,m'] ++ ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,sp2])) ps)
+or' (ms,(SM sp1@(PatSplit m p))) (ms',(PM (StrSplit m' s') ps')) =
+  (checkEmpty m'++ ms++ms', PM (StrSplit emptyMatch s') (sp1:ps'))
+or' (ms,sp1@(SM (StrSplit m s))) (ms',(PM sp2@(StrSplit m' s') ps'))  =
+  (L.concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [sp1,SM sp2])) ps')
+or' (ms,(PM sp1@(StrSplit m s) ps)) (ms',(PM sp2@(StrSplit m' s') ps')) = 
+  (L.concatMap checkEmpty [m,m'] ++ms++ms', PM (StrSplit emptyMatch (getShortestSegment [SM sp1, SM sp2])) (ps++ps'))
+or' ms _  = ms--trace ("or':"++show ms ++ show ms') undefined
+
+checkEmpty :: VMatch -> [VMatch]
+checkEmpty m 
+ | m == emptyMatch = []
+ | otherwise       = [m]
 
 splitTy :: Split -> SplitTy
 splitTy (SM s) = s
