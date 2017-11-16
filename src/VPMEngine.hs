@@ -84,13 +84,6 @@ continue s@(PM sp@(StrSplit m (j,s')) ps) = do
                 sps -> put (VPMEnv pat (getShortestSegment (((SM sp): (L.map snd sps)))) (matches env ++ (L.concatMap fst sps)))
               scan
 
-checkForeverPatterns :: [SplitTy] -> (Matches, [SplitTy])
-checkForeverPatterns [] = ([],[])
-checkForeverPatterns (s@(PatSplit m p):ps)
-   | foreverPatterns p  = let (ms,sp) = checkForeverPatterns ps
-                          in (m:ms,sp)
-   | otherwise          = let (ms,sp) = checkForeverPatterns ps
-                          in (ms, s:sp)
 
 match :: VPMState Split
 match = do
@@ -447,29 +440,9 @@ insertPos :: Pos -> Pos -> Pos -> Pos
 insertPos (NoPos) l r = P 0 (Right (l,r))
 insertPos (P b _) l r = P b (Right (l,r))
 
-{-combineSplit :: Pos -> Dim -> Split -> Split -> (Matches, Split)
-combineSplit p d NoMatch NoMatch = ([],NoMatch)
-combineSplit p d NoMatch sp      = ([],inRightSp p d sp)
-combineSplit p d sp NoMatch      = ([],inLeftSp p d sp)
-combineSplit p d (SM(StrSplit m (i,s))) (SM(StrSplit m' (i',s'))) = 
-   (((inLeft p d [m]) ++ (inRight p d [m])),SM $ StrSplit emptyMatch (insertPos p i i', createChoice d s s'))
-combineSplit p d (SM x@(PatSplit m p')) (SM y@(PatSplit m' p''))
-   | m == emptyMatch && m' ==emptyMatch = ([],NoMatch) 
-   | p' == p''  = SM $ PatSplit (inLandR p d m m') p'
-   | otherwise  = PM $ dummySplitTy ((inLSplitTys p d [x])++(inRSplitTys p d [y]))
-combineSplit p d sp@(SM x@(PatSplit m p')) (SM (StrSplit m'' (i,s))) 
-   | L.null s   = ((inRight p d [m'']),inLeftSp p d sp)      
-   | otherwise  = ((inRight p d [m'']),PM (StrSplit emptyMatch (insertPos p NoPos i),[Chc d [] s]) (inLSplitTys p d [x]))
-combineSplit p d (SM (StrSplit m'' (i,s))) sp@(SM x@(PatSplit m p'))
-   | L.null s   = ((inLeft p d [m'']),inRightSp p d sp)      
-   | otherwise  = ((inLeft p d [m'']),PM (StrSplit emptyMatch (insertPos p i NoPos),[Chc d s []]) (inRSplitTys p d [x]))
-combineSplit p d (PM s ss)-}
-
 createCC :: Dim -> VString -> VString -> VString
 createCC d [] [] = []
 createCC d l r   = [Chc d l r]
-
---mergeAltForCP ::
 
 mergeAltForCP ::  Pos -> Dim -> DimTy -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
 mergeAltForCP pos d dy (ms,NoMatch) (ms',NoMatch) = 
@@ -531,66 +504,6 @@ eliminateStr ((ms,(SM pat@(PatSplit m p))):ss) = let (ms',sp) = eliminateStr ss
                                                  in ((ms++ms'),pat:sp)
 
 
-combine :: Pos -> Dim -> DimTy -> (Matches,Split) -> (Matches,Split) -> (Matches,Split)
-combine pos d dy (ms,NoMatch) (ms',NoMatch) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy a@(ms, SM(StrSplit ma (_,[]))) b@(ms', SM(StrSplit ma' (_,[]))) = {-trace ("Combine" ++ show ms ++ show ma ++ show ms' ++ show ma')-}
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit ma None)) (ms', SM(PatSplit ma' None)) = 
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(PatSplit ma' (QVar y)) ) = 
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit (combine'' pos d dy ma ma' ) (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit ma Any)) (ms', SM(PatSplit ma' Any)) = 
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit (combine'' pos d dy ma ma' ) (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit m p)) (ms', SM(PatSplit m' q)) = {-trace ("Combine:" ++ show (SM(PatSplit (combine'' pos d dy m m') (PChc dy p q))))-}
-  ([combine'' pos d dy ma ma' | ma <- ms, ma' <- ms', ma/= emptyMatch, ma'/= emptyMatch], SM(PatSplit (combine'' pos d dy m m') (PChc dy p q)))
-  -- TODO should match only the same dimension if the next segment is a choice
-combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', SM(StrSplit ma' (_,[]))) = 
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (QVar x)) ) = 
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit ma (Any)) ) (ms', SM(StrSplit ma' (_,[]))) = 
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(StrSplit ma (_,[]))) (ms', SM(PatSplit ma' (Any)) ) = 
-  ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit ma (None)) ) (ms', SM(StrSplit ma' (i,s)))  
-  | L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(StrSplit ma (i,s))) (ms', SM(PatSplit ma' (None)) ) 
-  | L.null s = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-combine pos d dy (ms, SM(PatSplit ma (QVar x)) ) (ms', NoMatch)
-  | not $ L.null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-  | otherwise      = ([],NoMatch)
-combine pos d dy (ms, NoMatch) (ms', SM(PatSplit ma' (QVar x)) ) 
-  | not $ L.null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-  | otherwise      = ([],NoMatch)
-combine pos d dy (ms, SM(PatSplit ma Any) ) (ms', NoMatch)
-  | not $ L.null ms' = ([combine'' pos d dy m m' | m <- ma:ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-  | otherwise      = ([],NoMatch)
-combine pos d dy (ms, NoMatch) (ms', SM(PatSplit ma' Any) ) 
-  | not $ L.null ms  = ([combine'' pos d dy m m' | m <- ms, m' <- ma':ms', m/= emptyMatch, m'/= emptyMatch], SM (StrSplit emptyMatch (incBlock 1 pos,[])))
-  | otherwise      = ([],NoMatch)
-combine pos d dy a@(ms, SM(StrSplit ma (l,v1))) b@(ms', SM(StrSplit ma' (r,v2))) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy a@(ms, NoMatch) b@(ms', SM(PatSplit ma' p) ) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy (ms, SM(PatSplit ma' p) ) (ms', NoMatch) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy (ms, PM s ps ) (ms', NoMatch) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy a@(ms, NoMatch) b@(ms', PM s ps ) =
-  ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch], NoMatch)
-combine pos d dy (ms, PM s ps) (ms', SM s') = let (ms'',ps') = combineMultiple pos d dy (s:ps) [s'] 
-  in ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch]++ms'', PM (StrSplit emptyMatch (incBlock 1 pos,[])) ps')
-combine pos d dy (ms, SM s) (ms', PM s' ps) = let (ms'',ps') = combineMultiple pos d dy [s] (s':ps) 
-  in ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch]++ms'', PM (StrSplit emptyMatch (incBlock 1 pos,[])) ps')
-combine pos d dy (ms, PM s ps) (ms', PM s' ps') = let (ms'',ps'') = combineMultiple pos d dy (s:ps) (s':ps') 
-  in ([combine'' pos d dy m m' | m <- ms, m' <- ms', m/= emptyMatch, m'/= emptyMatch]++ms'', PM (StrSplit emptyMatch (incBlock 1 pos,[])) ps'')
-combine _ _ _ ms ms' = {-trace ("Combine: "++ show ms ++ " And " ++ show ms')-} ([],NoMatch)
-
-
-
-
-
 --wrap the matches within split with the choice and create a single split
 
 mergeAlt :: Dim -> Pos -> Split -> Split ->  (Matches,Split)
@@ -627,19 +540,6 @@ wrapChoice d pos (PatSplit m p) (PatSplit m' p')
    let p1 = PatSplit (L.head $ inLeft pos d [m]) p
        p2 = PatSplit (L.head $ inRight pos d [m']) p'
    in ([], PM dummySplitTy [p1,p2])
-
-
-{-inLSplitTys :: Pos -> Dim -> [SplitTy] -> [SplitTy]
-inLSplitTys p d [] = []
-inLSplitTys p d (s:ss) = case inLeftSp p d (SM s) of
-  NoMatch -> inLSplitTys p d ss
-  SM sp   -> sp : inLSplitTys p d ss
-  
-inRSplitTys :: Pos -> Dim -> [SplitTy] -> [SplitTy]
-inRSplitTys p d [] = []
-inRSplitTys p d (s:ss) = case inRightSp p d (SM s) of
-  NoMatch -> inRSplitTys p d ss
-  SM sp   -> sp : inRSplitTys p d ss -} 
 
 
 inLeftSp :: Pos -> Dim -> Split -> Split
@@ -789,6 +689,16 @@ foreverPatterns Any          = True
 foreverPatterns None         = True
 foreverPatterns (PChc _ p q) = foreverPatterns p && foreverPatterns q
 foreverPatterns _            = False
+
+
+checkForeverPatterns :: [SplitTy] -> (Matches, [SplitTy])
+checkForeverPatterns [] = ([],[])
+checkForeverPatterns (s@(PatSplit m p):ps)
+   | foreverPatterns p  = let (ms,sp) = checkForeverPatterns ps
+                          in (m:ms,sp)
+   | otherwise          = let (ms,sp) = checkForeverPatterns ps
+                          in (ms, s:sp)
+
 
 
 checkEmpty :: VMatch -> [VMatch]
