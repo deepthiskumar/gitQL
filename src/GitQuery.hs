@@ -2,7 +2,7 @@ module GitQuery where
 
 --import VPMNewTest
 import Prelude hiding (filter)
-import VPMNew
+import VPMEngine
 import VPMNewTest as T
 import Types
 
@@ -44,7 +44,7 @@ import Types
 
 data Filter = FilterDim DimVarName DimFilters --d (>= 100)
             -- | FilterQVar QVarName QVarName (FinalMatch -> FinalMatch -> Bool)
-            | FilterMatch (FinalMatch -> FinalMatch -> Bool)
+            | FilterMatch (VMatch -> VMatch -> Bool)
             
 data DimFilters = Comp (Int->Bool)
                 | Top Int --sort based on dimension
@@ -74,16 +74,16 @@ aND ms ms' = ms ++ ms'
 --TODO what to use?? $x or the whole match? or both? Check the chat bot command language
 qVar :: String -> Matches -> Matches
 qVar x []          = []
-qVar x ((_,[]):ms) = qVar x ms
-qVar x ((s,(q,m):qs):ms) 
-  | x == q         = (m,[]) : qVar x ((s,qs):ms)
-  | otherwise      = qVar x ((s,qs):ms)
+qVar x ((VMatch _ _ []):ms) = qVar x ms
+qVar x ((VMatch p v ((q,m):qs)):ms) 
+  | x == q         = (VMatch (fst m) (snd m) []) : qVar x ((VMatch p v qs):ms)
+  | otherwise      = qVar x ((VMatch p v qs):ms)
 
-vString :: VMatch -> Input
+vString :: (MetaInfo,VString) -> Input
 vString ((pos,_),vs) = (pos,vs)
 
-getMatch :: FinalMatch -> Input
-getMatch (((pos,_),vs),_) = (pos,vs)
+getMatch :: VMatch -> Input
+getMatch (VMatch (pos,_) vs _) = (pos,vs)
 
 listDim :: VString -> [Dim]
 listDim [] = []
@@ -92,14 +92,14 @@ listDim (Chc d _ _ : vs) = d: listDim vs
 
 getDims :: String -> Matches -> [Dim]
 getDims x [] = []
-getDims x ((((p,d),s),q):ms) = 
+getDims x ((VMatch (p,d) s q):ms) = 
  (concatMap (\(d',dim)-> if d' == x then [dim] else [] ) d) ++
   getDims x ms
 
 -- Sub query
 vgrepAgain :: Pattern -> [Input] -> Matches
 vgrepAgain _ [] = []
-vgrepAgain p (i:is) = (fst (scan p i)) ++ vgrepAgain p is
+vgrepAgain p (i:is) = (vgrepWithPos p i) ++ vgrepAgain p is
 
 --Predicates
 
@@ -121,4 +121,12 @@ filter ft@(FilterMatch f) ms ms'  =
       nm'= qVar r ms
   in concat [ [m,m'] | m<-nm, m'<-nm',  f m m']-}
 --Helpers
+
+getDimEnv :: VMatch -> DimEnv
+getDimEnv (VMatch (_,dimenv) _ _) = dimenv
+
+getDim :: DimVarName -> DimEnv -> Maybe Int
+getDim d ds = lookup d ds
+
+
 

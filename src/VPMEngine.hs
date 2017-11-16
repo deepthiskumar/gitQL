@@ -33,6 +33,8 @@ type VPMState a = State VPMEnv a
 vgrep :: Pattern -> VString -> Matches
 vgrep p vs = L.reverse $ matches $ execState (scan) (VPMEnv p (nextBlock NoPos vs,vs) [])
              
+vgrepWithPos :: Pattern -> Input -> Matches
+vgrepWithPos p vs = L.reverse $ matches $ execState (scan) (VPMEnv p vs [])
 
 scan ::  VPMState Split
 scan = do

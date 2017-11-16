@@ -32,6 +32,15 @@ data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
 
 type QVarName = String
 
+data Sel = LSel !Dim | RSel !Dim  deriving(Eq)
+type Selection = [Sel]
+
+data Alt = L | R deriving Eq
+
+instance Show (Sel) where
+    show (LSel d) = (show d) ++ ".l"
+    show (RSel d) = (show d) ++ ".r"
+
 --Variational Match
 
 type Matches = [VMatch]

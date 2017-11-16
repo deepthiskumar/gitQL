@@ -9,7 +9,8 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 import Text.Parsec.Pos
 import Text.ParserCombinators.Parsec.Error
 import VPMNewTest
-import VPMNew
+import VPMEngine
+import Types
 import Data.Dates
 import Data.Time
 
@@ -185,11 +186,11 @@ data DimTy = D Dim | DVar DimVarName deriving(Show,Eq)
 
 many1Pattern :: Parser Pattern
 many1Pattern = do
-  ps <- many1 pattern
+  ps <- many1 cpattern
   return $ VPMNewTest.seq  ps
 
-pattern :: Parser Pattern
-pattern = try ( --seqPattern  <|> 
+cpattern :: Parser Pattern
+cpattern = try ( --seqPattern  <|> 
           altPattern <|>
           pPattern <|>
           basePattern-- <|>
@@ -199,21 +200,21 @@ pPattern :: Parser Pattern
 pPattern = parens many1Pattern
       
 basePattern :: Parser Pattern
-basePattern = try (  str <|>
+basePattern = try (  strP <|>
       choicePattern <|>
-      queryVar <|>
-      underscore 
+      underscore <|>
+      queryVar
       )
       
-str :: Parser Pattern
-str = try( do
+strP :: Parser Pattern
+strP = try( do
   s <- stringLiteral
   return $ VPMNewTest.seq $ map ch s )
   
 underscore :: Parser Pattern
 underscore = try( do
  symbol "_"
- return $ Plain Wild )
+ return $ Any )
  
 emptyString :: Parser Pattern
 emptyString = try( do
@@ -386,8 +387,8 @@ noneRight = try(do
    
 seqPattern :: Parser Pattern
 seqPattern =  try( do
- p1 <- try ( basePattern <|> pattern)
- p2 <- try ( basePattern <|> pattern)
+ p1 <- try ( basePattern <|> cpattern)
+ p2 <- try ( basePattern <|> cpattern)
  return $ Seq p1 p2 )--use lists for sequence of patterns?  
 
 getDateTime :: String -> LocalTime

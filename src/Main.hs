@@ -1,7 +1,8 @@
 import System.TimeIt
-import CCLib
+import CCLibPat
 import VPMNewTest
-import VPMNew
+import VPMEngine
+import Types
 import Prelude hiding (readFile,seq)
 import System.IO.Strict (readFile)
 import System.Environment (getArgs)
@@ -11,6 +12,8 @@ import Data.List (nub)
 import GitParser
 import GitQuery
 import Pretty
+import Data.Text as T hiding (map, concatMap, head, length)
+import MetaFileReader
 
 {- TODO
 1. implement _
@@ -38,7 +41,7 @@ prettyVString :: VString -> String
 prettyVString = concatMap prettySegment
 
 prettySegment :: Segment -> String
-prettySegment (Str t)     = t
+prettySegment (Str t)     = T.unpack t
 prettySegment (Chc d v v') = showChc d (map prettyVString [v,v'])
 
 showInp :: [Input] -> String
@@ -118,6 +121,10 @@ runVgrep (MatchGen v p (VBinding var) c) env = do
 runVgrep (MatchGen v p (Q q@(Query vs ms ) ) c) env      = do
   env' <- runQuery q
   return ((v,VRes $ map getMatch (vgrepAgain p (getVStringFromEnv $ lookupMany vs env'))):env)
+ 
+getDimCond :: Maybe Conditions -> [Dim]
+getDimCond Nothing = []
+getDimCond Just c  = undefined 
   
 lookupMany :: [Var] -> Env -> Env
 lookupMany [] env = []
@@ -139,12 +146,12 @@ getInputFromRes (DRes dims)  = error $ "Cannot use commit meta-info as source"
 
 allQVar ::  Matches -> Env -> Env
 allQVar [] env                = env
-allQVar ((_,[]):ms) env       = allQVar ms env
-allQVar ((s,(q,m):qs):ms) env = let env' = merge (q,m) env
- in allQVar ((s,qs):ms) env'
+allQVar ((VMatch _ _ []):ms) env       = allQVar ms env
+allQVar ((VMatch p v ((q,m):qs)):ms) env = let env' = merge (q,m) env
+ in allQVar ((VMatch p v qs):ms) env'
 
  
-merge :: (String, VMatch) -> Env -> Env
+merge :: (String, (MetaInfo,VString)) -> Env -> Env
 merge (q,m) [] = [(q, VRes [vString m])]
 merge (q,m) (e@(v,VRes vs):env) 
   | q == v    = (q,VRes (vString m : vs) ) :env
