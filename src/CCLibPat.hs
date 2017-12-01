@@ -133,12 +133,17 @@ module CCLibPat where
 
   showSegment :: Segment -> String
   showSegment (Str t)     = unpack t--showText t--intercalate " " t
-  showSegment (Chc d v v') = showChcNoColor d (L.map showVText [v,v'])
+  showSegment (Chc d v v') = showChcNoColor (show d) (L.map showVText [v,v'])
   
   
   --tokenizes into words and also maintains the spaces between them as tokens.
   tokenizer :: Text -> [Text]
-  tokenizer s 
+  tokenizer s
+    | T.null s = []
+    | otherwise = tokenizer' s
+  
+  tokenizer' :: Text -> [Text]
+  tokenizer' s 
     | T.null s  = []
     | otherwise = 
       let (spaces, s1) = T.break (/=' ') s
@@ -172,7 +177,7 @@ module CCLibPat where
   ccFile = do
     doc <- many ccConstruct
     eof
-    return doc
+    return (emptyStr doc)
 
   ccConstruct :: GenParser Char st (Segment)
   ccConstruct = do
@@ -182,7 +187,11 @@ module CCLibPat where
   ccPlain = fmap (Str.(T.pack)) $ many1 $ noneOf escape{-try $ do 
     p <- many1 $ noneOf escape
     trace (show p ++ "AND" ++ show (tokenizer p)) (return $ Plain (tokenizer p))-}
-    
+  
+  emptyString :: GenParser Char st (Segment)
+  emptyString = do
+    string ""
+    return $ Str T.empty
 
   ccChoice :: GenParser Char st (Segment)
   ccChoice = try $ do
@@ -195,7 +204,11 @@ module CCLibPat where
     right <- many ccConstruct
     string escape
     char '>'
-    return $ Chc (read dim :: Int) left right
+    return $ Chc (read dim :: Int) (emptyStr left) (emptyStr right)
+    
+  emptyStr :: VString -> VString
+  emptyStr [] = [Str T.empty]
+  emptyStr xs = xs
 
   ccParser :: String -> Either ParseError VString
   ccParser = parse ccFile ""

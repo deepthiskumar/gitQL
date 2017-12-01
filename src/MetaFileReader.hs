@@ -38,11 +38,11 @@ parseContents (l:ls) m
    
 metaData :: Text -> (Dim, MetaData)
 metaData line = case T.splitOn pipe line of
-       [id,dim,d,author,vd] -> trace (show [id,dim,d,author,vd]) (readDim dim, MetaData id (readDate d ) author (readVD vd)) 
+       [id,dim,d,author,vd] -> {-trace (show [id,dim,d,author,vd])-} (readDim dim, MetaData id (readDate d ) author (readVD vd)) 
        x                 -> trace (show x) undefined   
  
 readDim :: Text -> Dim
-readDim t = trace (show t) (read (T.unpack t) ::Dim)
+readDim t = {-trace (show t)-} (read (T.unpack t) ::Dim)
 
 readDate :: Text -> DateTime
 readDate t = fromJust $ parseDateTime dateFormat (T.unpack (L.head (T.splitOn space t)))

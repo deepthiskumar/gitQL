@@ -11,21 +11,24 @@ import Text.ParserCombinators.Parsec.Error
 import VPMNewTest
 import VPMEngine
 import Types
-import Data.Dates
+import Data.DateTime
 import Data.Time
+import Data.Text as T hiding (map)
+import Data.Maybe
 
 data Query = Query [Var] Search
  deriving(Show)
 
-type Var = String
+data Var = VStr String | VPos String | VCount String
+  deriving(Show)
 
 type Search = [MatchGen]
 
-data MatchGen = MatchGen Var Pattern Source (Maybe Conditions)
+data MatchGen = MatchGen String Pattern Source (Maybe Conditions)
  deriving(Show)
 
 data Source = FName String 
-            | VBinding Var
+            | VBinding String
             | Q Query
             deriving(Show)
             
@@ -37,16 +40,16 @@ data Conditions = Cond Condition
 
 data BoolOp = And | Or deriving (Show)
 
-data RelOp = Gr | Ls | Gt | Lt | Equ  
+data RelOp = Gr | Ls | Ge | Le | Equ | NotEqu 
   deriving(Show)
                 
 data Condition = CommitInfo RelOp Info Info
-               | ResultComp RelOp Var Var
+               | ResultComp RelOp String String
                deriving(Show)
 
 data Info = CDate DimTy
           | CAuthor DimTy
-          | DateVal LocalTime
+          | DateVal DateTime
           | AuthorVal String
           deriving(Show)
           
@@ -102,7 +105,7 @@ languageDef =
 languageDef = emptyDef {
    Token.identStart       =   letter <|> char '_' ,
    Token.identLetter      =   alphaNum <|> char '_' <|> char '\'' ,
-   Token.reservedNames    =   [ "from", "vgrep", "where", "in", "date", "author" ], 
+   Token.reservedNames    =   [ "from", "vgrep", "where", "in", "date", "author", "pos", "count" ], 
    Token.reservedOpNames  =   [">", "<", ">=", "<=", "==", "/=", "and", "or", "not"]
    }
 
@@ -140,7 +143,28 @@ query' = do
   return $ Query vs s
   
 listOfVals :: Parser [Var]
-listOfVals = commaSep1 identifier
+listOfVals = commaSep1 value
+
+value :: Parser Var
+value = try (pos <|> countP <|> identifier' )
+
+identifier' :: Parser Var
+identifier' = do
+  s <- identifier
+  return $ VStr s
+  
+pos :: Parser Var
+pos = do
+  reserved "pos"
+  s <- identifier
+  return $ VPos s
+  
+countP :: Parser Var
+countP = do
+   reserved "count"
+   s <- identifier
+   return $ VCount s
+
 
 matchGens :: Parser Search
 matchGens = commaSep1 matchGens'
@@ -149,7 +173,7 @@ matchGens' :: Parser MatchGen
 matchGens' = do
   m <- identifier
   symbol "<-"
-  reserved "vgrep"
+  reserved "match"
   p <- many1Pattern
   reserved "in"
   s <- source
@@ -236,7 +260,7 @@ commit = try (commitStr <|> commitVar)
 
 commitStr :: Parser DimTy
 commitStr = try( do
-  symbol "!"
+  symbol "#"
   dim <- integer--stringLiteral
   return $ D $ fromIntegral dim)
   
@@ -274,8 +298,11 @@ source = try (filename <|> vBinding <|> sQuery)
 filename :: Parser Source
 filename = try( do
   symbol "-f"
-  i <- try (stringLiteral <|> many1 anyChar)
-  return $ FName i)
+  i <- try (stringLiteral <|> many1 filenameChars)
+  return $ FName (T.unpack $ T.strip $ T.pack i))
+  
+filenameChars :: Parser Char
+filenameChars = try (alphaNum <|> (char '/') <|> (char '-') <|> (char '_') <|> (char '.') <|> (char '\\'))
   
 vBinding :: Parser Source       
 vBinding = try( do
@@ -290,12 +317,15 @@ sQuery = try( do
   
 whereClause :: Parser Conditions
 whereClause = do
+ whiteSpace
  reserved "where"
+ --whiteSpace
  c <- conditions
+ --whiteSpace
  return c
  
 conditions :: Parser Conditions
-conditions  = buildExpressionParser bOperators bterm
+conditions  = try ((buildExpressionParser bOperators bterm) <|> getCond)
 
 --condition :: Parser Condition
 --condition = buildExpressionParser rOperators rterm
@@ -328,44 +358,46 @@ resultComp =
       return $ ResultComp op a1 a2
       
 info :: Parser Info
-info = try(commDate <|> commAuth <|> dateVal <|> authVal)
+info = try( commVal <|> dateAuthVal)
 
-commDate :: Parser Info
-commDate = do
+commVal :: Parser Info
+commVal = do
   c <- commit
   symbol "."
-  reserved "date"
-  return (CDate c)
+  try ( (do {reserved "date" ; return (CDate c)}) <|> (do {reserved "author" ; return (CAuthor c)}))
   
-commAuth :: Parser Info
-commAuth = do
-  c <- commit
-  symbol "."
-  reserved "author"
-  return (CAuthor c)
-  
-dateVal :: Parser Info
-dateVal = do
-  dateString <- stringLiteral
-  return (DateVal (getDateTime dateString))
+dateAuthVal :: Parser Info
+dateAuthVal = do
+  s <- stringLiteral
+  let d = readDate s
+  case d of
+    Nothing -> return $ AuthorVal s
+    Just d  -> return $ DateVal d
 
-rOperators =   (reservedOp ">" >> return Gr)
+readDate :: String -> Maybe DateTime
+readDate t = parseDateTime dateFormat t
+
+dateFormat = "%Y/%m/%d" --same as %Y-%m-%d
+
+rOperators =  try( (reservedOp ">" >> return Gr)
                <|> (reservedOp "<" >> return Ls) 
-               <|> (reservedOp ">=" >> return Gt) 
-               <|> (reservedOp "<=" >> return Lt) 
+               <|> (reservedOp ">=" >> return Ge) 
+               <|> (reservedOp "<=" >> return Le) 
                <|> (reservedOp "==" >> return Equ)
+               <|> (reservedOp "/=" >> return NotEqu))
                
-authVal :: Parser Info
-authVal = do
-  authString <- stringLiteral
-  return (AuthorVal authString)
   
 parseString :: String -> Query
 parseString str =
   case parse whileParser "" str of
-    Left e  -> error $ show e
+    Left e  -> error $ ("Syntax Error: " ++ show e)
     Right r -> r
-    
+
+parseWhere :: String -> Conditions
+parseWhere str = 
+  case parse whereClause "" str of
+    Left e  -> error $ ("Syntax Error: " ++ show e)
+    Right r -> r
 ---Helpers---------------------------------------------------
 
 rightChoice :: Parser Pattern

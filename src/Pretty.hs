@@ -19,7 +19,7 @@ commasNoColor = concat . intersperse (escape ++ ",")
 
 bracketsNoColor s = "<" ++ s ++ escape ++ ">"
 
-showChcNoColor d es = escape ++ show d ++ bracketsNoColor (commasNoColor es)
+showChcNoColor d es = escape ++ d ++ bracketsNoColor (commasNoColor es)
 
 
 --
