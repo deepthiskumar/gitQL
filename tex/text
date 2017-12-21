@@ -1,6 +1,0 @@
-Consider a scenario where a file consists of a function named foo. A branch is created from the main branch to add a different implementation of foo called baz while retaining foo. The user now decides to rename all the calls to foo to baz. 
-Meanwhile, the function name foo its function calls were changed to bar in the main branch. 
-Now, the newer implementation baz is better and tested thoroughly, and the developer decides to merge it. While merging the new implementation, of course, there is merge conflict and so the user resolves it by changing the function calls to bar to baz so as to retain the older function bar.
-
-In the main branch, the function calls were changed from foo to bar and then again from bar to baz. 
-At a later point, the software behaves funnily because some of the calls were still being made to bar. Therefore, the users want to look up all the places where the call to bar was not changed to baz. 
