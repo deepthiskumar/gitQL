@@ -1,0 +1,75 @@
+-- This file has been generated from package.yaml by hpack version 0.20.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: b910b6daed9e8db728e8a1108c535d65683f67b0649134ebb174c70335276239
+
+name:           gitQL
+version:        0.1.0.0
+synopsis:       Short description of your package
+description:    Please see the README on Github at <https://github.com/githubuser/gitQL#readme>
+homepage:       https://github.com/githubuser/gitQL#readme
+bug-reports:    https://github.com/githubuser/gitQL/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2017 Author name here
+license:        Apache2
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/gitQL
+
+library
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5,
+      text,
+      containers,
+      datetime,
+      split,
+      deepseq,
+      parsec,
+      patience,
+      transformers,
+      time
+  exposed-modules:
+      Types, CCLibPat, VPMEngine, VPMNewTest, GitParser, GitQuery, MetaFileReader, Pretty
+  other-modules:
+  default-language: Haskell2010
+
+executable gitQL-exe
+  main-is: Main.hs
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.9 && <5,
+      gitQL,
+      time,
+      strict,
+      text,
+      containers,
+      datetime,
+      directory,
+      timeit
+  other-modules:
+  default-language: Haskell2010
+
+test-suite gitQL-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.9 && <5
+    , gitQL
+  other-modules:
+  default-language: Haskell2010
