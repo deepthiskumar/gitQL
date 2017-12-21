@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances, ScopedTypeVariables, DeriveGeneric, DeriveAnyClass #-}
-
+{- Note: This module is built on the distill functionality implemented by Wyatt Allen, Variational parsing with the choice calculus. Master’s thesis, Oregon
+State University, 2014. -}
 module CCLibPat where
 
   import Data.List as L
@@ -16,27 +17,12 @@ module CCLibPat where
   import Data.Text as T
   import Types
   
-  {-type VString = [Segment]
-
-  type Dim = Int
-
-  data Segment = Str Text | Chc Dim VString VString
-             deriving(Show, Eq, Generic, NFData, Ord)-}
-
-  --intermediate vstring that has tokens.
-  --This is to maintain the tokens instead of the tokenize-concat-tokenize-concat
-  --that happens in the denormalize function and l       
-  type VStringIntr = [SegmentIntr]
-  data SegmentIntr = StrIntr [Text] |ChcIntr Dim VStringIntr VStringIntr
 
   escape = "ⱺ"
 
   -- Use a sequence of child indices as a path type:
   type Path = [Int]
   type VMap = [(Int, Path)]
-
-  --lift :: [a] -> VText
-  --lift = (VText(:[])) . Plain
 
 --  Customized diff
 --------------------------------------------------------------------------------
@@ -55,8 +41,6 @@ module CCLibPat where
   appendD :: Edit a -> [Diff a] -> [Diff a]
   appendD (Add x) (Different [] y : ds)       = (Different [] (x:y)) : ds
   appendD (Delete x) (Different y [] : ds)    = (Different (x:y) []) : ds
-  --appendD (Add x) (Different y [] : ds)       = (Different [] (x:y)) : ds
-  --appendD (Delete x) (Different [] y : ds)    = (Different (x:y) []) : ds
   appendD (Update x y) (Different x' y' : ds) = (Different (x:x') (y:y')) : ds
   appendD (NoChange x) (Same y : ds)          = (Same (x:y)) : ds
   appendD (Add x) ds                          = (Different [] [x]) : ds
@@ -303,7 +287,7 @@ module CCLibPat where
   bs1' (b:bs) = (L.map (subtract b) $ b:bs)
   
   bs'' x (b:bs) = L.map (subtract $ L.length (tokenizer x)) (b:bs)
-  
+  -- Implment such that we do not have to subtract. create like a list of lists and just remove the head element
   x' :: Int -> Text -> [Text]
   x' b x = (L.take $ b) $ (tokenizer $ x)
   
@@ -317,25 +301,6 @@ module CCLibPat where
   z' s x rem vs (b:bs) = d s ((Str (T.drop rem x )) :vs) bs
   
   
-  {-z' :: Selection -> Text -> Int -> VString -> [Int] -> (VString, [Int])
-  z' s x rem vs (b:bs) = d s ((Str $ T.concat $ x'' b x) : vs)(L.tail $ bs1' (b:bs)) --d s ((Str (T.drop rem x )) :vs) (L.tail $ bs1' (b:bs))--bs--(((d $ s) $!! ((Str $ (T.concat $!! (x'' b x))):vs)) $!! bs)-}
-  
-  
-        
-      {-trace ("Denormalize: " ++ show x ++ " | " ++ show b )-} {-(case length (tokenizer x) `compare` b of
-        EQ -> ((^:) $!! (Plain $!! x)) $!! z
-        LT -> trace("LT :"++ show x ++ " b= " ++ show b ++ " VS: " ++ show vs) undefined--((Plain x) ^: (d s (VText vs) bs'')) -- is this a valid case??
-        GT -> (((^:) $!! (Plain $!! (concat $!! x'))) $!! z'))
-         where
-          bs1'  = (map (subtract b) $ b:bs)
-          bs''  = map (subtract $ length (tokenizer x)) (b:bs)
-          x'    = (take $!! b) $!! (tokenizer $!! x)
-          x''   = (drop $!! b) $!! (tokenizer $!! x)
-          z     = (((d $!! s) $!! (VText $!! vs)) $!! bs)--tail bs1')
-          z'    = (((d $!! s) $!! (VText $!! ((Plain $!! (concat $!! x'')):vs))) $!! bs)--tail bs1')-}
-          
-          --How to implment such that we do not have to subtract. create like a list of lists and just remove the head element
-  
 
   normalize :: VString -> VString
   normalize []                  = []
@@ -346,49 +311,23 @@ module CCLibPat where
       | otherwise  = (Chc d (normalize l) (normalize r)) : normalize ((Chc d' l' r'):z)
   normalize ((Chc d l r):z) = (Chc d (normalize l) (normalize r)) : (normalize z)
 
---Unnesting
------------------------------------------------------------------------------------------
-{-unnest :: VText -> VText
-unnest VText [] = VText []
-unnest VText xs = unnestRecur xs
-
-unnestRecur :: [Segment] -> [Segment]
-unnestRecur [] = []
-unnestRecur (x:xs) = case x of
-                      Plain a -> [Plain a] ++ (unnestRecur xs)
-                      c -> (unnestChoices c) ++ (unnestRecur xs)
-
-unnestChoices :: Segment -> [Segment]
-unnextChoices [] = []
-unnestChoices Chc d v1 (VText vs) = case (last vs) of
-			             Chc d1 (VText [Plain ""]) (VText [Plain a]) -> (unnestChoices $ Chc d v1 (VText (init vs))) ++ [Chc d1 (VText [Plain ""]) (VText [Plain a])]
-                                     _ -> [Chc d v1 (VText vs]
-unnestChoices (Plain a) = [Plain a]
-
-sepSegments :: [Segment] -> [Segment]
-sepSegments [] = []
-sepSegments xs = case last xs of --last takes O(n). Use sequence which has constant time access to the fisrt and last element
-                  Plain x -> xs
-                  Chc d
- -}
-
 
 --  Distillation
 --------------------------------------------------------------------------------
 
   distill :: Int -> VString -> Selection -> Text -> VString
-  distill dim v s n = {-trace (show pv ++ "\n" ++ show d)-} (normalize $ fst $ ((l $ pv) $ d)) --deepseq pv
+  distill dim v s n = (normalize $ fst $ ((l $ pv) $ d)) --deepseq pv
     where
       (o, m) = s `applySelectionWithMap` v
       d      = ((partitionDiff $ ((tokenizer $ o) -?- (tokenizer $ n))) $ L.map fst m)
-      pv     = {-trace ("Partitioned Diffs: "++ show d ++ " Boundaries: "++ show (diffBoundaries $ d))-} (((denormalizeV $ s) $ v) $ diffBoundaries $ d)
+      pv     = (((denormalizeV $ s) $ v) $ diffBoundaries $ d)
 
       (^:) :: Segment-> (VString, [Diff Text]) -> (VString, [Diff Text])
       x ^: (y, z) = ((x:y), z)
 
       l :: VString -> [Diff Text] -> (VString, [Diff Text])
 
-      l [] di@((Different [] x):ds) = {-trace ("1. [] and "++ show di)-} ([Chc dim [] [Str (T.concat x)]], ds)
+      l [] di@((Different [] x):ds) = ([Chc dim [] [Str (T.concat x)]], ds)
 
       l [] ds = ([], ds)
       
@@ -399,25 +338,25 @@ sepSegments xs = case last xs of --last takes O(n). Use sequence which has const
       -- Unchanged plain text:
       l vt@((Str x):vs) dif@((Same y):ds)
         | T.null x         = (Str x) ^: l vs dif --empty String
-        |  x == T.concat y = {-trace ("2."++ show vt ++ " and "++ show dif)-} (Str x ^: (l vs ds))
+        |  x == T.concat y = (Str x ^: (l vs ds))
         | otherwise = {-trace ("2."++ show x ++ " and "++ show y)-} undefined
 
       -- Addition:
-      l vs dif@((Different [] x):ds) = {-trace ("3."++ show vs ++ " and "++ show dif)-} (Chc dim [] ([Str (T.concat x)]) ^: (l vs ds))
+      l vs dif@((Different [] x):ds) =  (Chc dim [] ([Str (T.concat x)]) ^: (l vs ds))
 
       -- Removal:
-      l vt@((Str x):vs) dif@((Different x' []):ds) = {-trace ("4."++ show vt ++ " and "++ show dif)-} 
+      l vt@((Str x):vs) dif@((Different x' []):ds) =  
         (Chc dim [Str x] [] ^: (l vs ds))
 
       -- Changed plain:
-      l vt@((Str x):vs) dif@((Different x' y):ds) = {-trace ("5."++ show vt ++ " and "++ show dif)-} (if x == (T.concat x')
+      l vt@((Str x):vs) dif@((Different x' y):ds) = (if x == (T.concat x')
         then Chc dim [Str x] [Str (T.concat y)] ^: (l vs ds)
         else error $ L.concat [ "Mismatch ", show vt, " /= ", show x', " and ", show y ])
 
       -- Recurse downward along choice:
-      l vt@((Chc dim' left right):vs) ds = {-trace ("6."++ show vt ++ " and "++ show ds)-} (case dim' `asSelectedIn` s of
+      l vt@((Chc dim' left right):vs) ds = case dim' `asSelectedIn` s of
         L -> l' id    left right
-        R -> l' flip  right left)
+        R -> l' flip  right left
         where
           l' f x y = ((f $ Chc dim') x' y) ^: (l vs ds')
             where

@@ -6,13 +6,13 @@
 
 name:           gitQL
 version:        0.1.0.0
-synopsis:       Short description of your package
-description:    Please see the README on Github at <https://github.com/githubuser/gitQL#readme>
-homepage:       https://github.com/githubuser/gitQL#readme
-bug-reports:    https://github.com/githubuser/gitQL/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2017 Author name here
+synopsis:       
+description:    Please see the README on Github at <https://github.com/deepthiskumar/gitQL#readme>
+homepage:       https://github.com/deepthiskumar/gitQL#readme
+bug-reports:    https://github.com/deepthiskumar/gitQL/issues
+author:         Deepthi S Kumar
+maintainer:     
+copyright:      2017 Deepthi S Kumar
 license:        Apache2
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/gitQL
+  location: https://github.com/deepthiskumar/gitQL
 
 library
   hs-source-dirs:
